@@ -38,6 +38,7 @@ jobs:
           echo "FASTCLOUD_ANDROID_KEYSTORE=$RUNNER_TEMP/fastcloud-mobile.p12" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm run check && npm test
+      - run: python3 -m unittest discover -s tools -p 'test_*.py'
       - run: npm run build && npx cap sync android
       - run: chmod +x android/gradlew
       - name: Build and verify the signed APK

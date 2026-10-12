@@ -2,6 +2,21 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.1",
+      "ru": {
+        "title": "Veirune Mobile 0.1.1",
+        "changes": [
+          "Исправлена подготовка подписанного Android-релиза для скачивания и обновлений."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.1",
+        "changes": [
+          "Fixed signed Android release preparation for downloads and updates."
+        ]
+      }
+    },
+    {
       "version": "0.1.0",
       "ru": {
         "title": "Veirune теперь на Android",

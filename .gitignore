@@ -16,3 +16,6 @@ audit.json
 *.p12
 *.pem
 release/
+
+__pycache__/
+*.pyc

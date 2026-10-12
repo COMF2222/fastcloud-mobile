@@ -3,6 +3,21 @@ import argparse,hashlib,json,os,re,shutil,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
+def release_certificate(output, expected):
+    """Accept old/new apksigner labels, but only the pinned release certificate."""
+    expected=expected.strip().lower()
+    if not re.fullmatch(r'[a-f0-9]{64}', expected):
+        raise ValueError('Invalid expected release certificate fingerprint')
+    certificates={value.lower() for value in re.findall(
+        r'^.*\bcertificate SHA-256 digest:\s*([a-fA-F0-9]{64})\s*$',
+        output, re.MULTILINE)}
+    if not certificates:
+        raise ValueError('apksigner did not report a signing certificate SHA-256 digest')
+    if certificates != {expected}:
+        raise ValueError('APK signer does not match the persistent release certificate')
+    return expected
+
+
 def stage(apk,output):
     package=json.loads((ROOT/'package.json').read_text(encoding='utf-8'))
     version=package['version']
@@ -17,10 +32,10 @@ def stage(apk,output):
             configured=json.loads(runtime.read_text());sdk=configured['sdk'];env['JAVA_HOME']=configured['java'];env['PATH']=str(Path(configured['java'])/'bin')+os.pathsep+env['PATH']
     if not sdk:raise ValueError('Android SDK is not configured')
     tools=sorted((Path(sdk)/'build-tools').iterdir(),key=lambda path:tuple(int(v) for v in path.name.split('.') if v.isdigit()))[-1]
+    print(f'Verifying APK with Android Build Tools {tools.name}')
     signer=tools/('apksigner.bat' if os.name=='nt' else 'apksigner')
     result=subprocess.run([str(signer),'verify','--verbose','--print-certs',str(apk)],capture_output=True,text=True,env=env,check=True)
-    certificate=re.search(r'Signer #1 certificate SHA-256 digest: ([a-f0-9]{64})',result.stdout)
-    if not certificate or 'Android Debug' in result.stdout:raise ValueError('Public release requires the persistent private signing key')
+    certificate=release_certificate(result.stdout,(ROOT/'android/release-certificate.sha256').read_text(encoding='ascii'))
     aapt=tools/('aapt2.exe' if os.name=='nt' else 'aapt2')
     details=subprocess.run([str(aapt),'dump','badging',str(apk)],capture_output=True,text=True,env=env,check=True).stdout
     identity=re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'",details)
@@ -33,7 +48,7 @@ def stage(apk,output):
     output.mkdir(parents=True,exist_ok=True)
     name=f'Veirune-Mobile-{version}.apk';shutil.copy2(apk,output/name)
     with apk.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
-    info={'version':version,'build':build,'packageId':identity[1],'bytes':apk.stat().st_size,'sha256':digest,'signatureSha256':certificate[1],'url':f'https://github.com/COMF2222/fastcloud-mobile/releases/download/{tag}/{name}','notes':{language:note[language]['changes'] for language in ('ru','en')}}
+    info={'version':version,'build':build,'packageId':identity[1],'bytes':apk.stat().st_size,'sha256':digest,'signatureSha256':certificate,'url':f'https://github.com/COMF2222/fastcloud-mobile/releases/download/{tag}/{name}','notes':{language:note[language]['changes'] for language in ('ru','en')}}
     (output/'latest-android.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (output/'notes.md').write_text('# '+note['ru']['title']+'\n\n'+'\n'.join('- '+value for value in note['ru']['changes'])+'\n\n# '+note['en']['title']+'\n\n'+'\n'.join('- '+value for value in note['en']['changes'])+'\n',encoding='utf-8')
     print(f'Verified mobile {version}, build {build}, {apk.stat().st_size} bytes; signed release ready')

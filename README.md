@@ -15,7 +15,7 @@ npm run apk
 Install on Android 7 or newer. On this owner's Windows machine, `npm run apk`
 uses the persistent private signing key created in `%LOCALAPPDATA%/Fastcloud/mobile-signing`.
 Run `python tools/stage-android-release.py` to verify and stage
-`release/Veirune-Mobile-0.1.0.apk`. Without a configured key, the build helper
+`release/Veirune-Mobile-0.1.1.apk`. Without a configured key, the build helper
 produces a debug APK for development only. Never commit signing keys or passwords.
 
 ```powershell
@@ -70,3 +70,6 @@ See [publication commands](docs/deployment.md) and [verification](docs/verificat
 The mobile wave uses listening, likes, skips and metadata; desktop CLAP embedding
 inference is not bundled on the phone. iOS EQ/normalization remain unavailable.
 Android source/build success does not substitute for an Honor playback test.
+
+Release staging checks the APK certificate against `android/release-certificate.sha256`.
+This public fingerprint is not a signing key; keep the same private key for every update.

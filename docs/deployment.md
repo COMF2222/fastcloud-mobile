@@ -2,7 +2,7 @@
 
 Приложение называется **Veirune**. Идентификаторы пакетов, домен, адреса репозиториев и ключи подписи сохраняются для совместимости.
 
-Подготовлены мобильный клиент **0.1.0**, помощь со входом с ПК в desktop **0.4.15** и серверные изменения. Десктопные изменения подготовлены поверх исходников **0.4.14**; существующие теги и опубликованные манифесты не изменены. Ничего не отправлено на GitHub и сервер автоматически.
+Подготовлены мобильный клиент **0.1.1**, помощь со входом с ПК в desktop **0.4.16** и серверные изменения. Десктопные изменения подготовлены поверх исходников **0.4.14**; существующие теги и опубликованные манифесты не изменены. Ничего не отправлено на GitHub и сервер автоматически.
 
 ## 1. Обновить сервер
 
@@ -25,7 +25,7 @@ ssh fastcloud "cd ~/fastcloud-backend && git pull --ff-only && bash deploy_check
 ```powershell
 cd D:\projects\fastcloud
 git add .
-git commit -m "feat: Veirune branding, selectable icons and mobile pairing; release 0.4.15"
+git commit -m "feat: Veirune branding, selectable icons and mobile pairing; release 0.4.16"
 git push origin main
 ```
 
@@ -33,15 +33,15 @@ git push origin main
 
 ```powershell
 cd D:\projects\fastcloud
-git tag -a v0.4.15 -m "Veirune v0.4.15"
-git push origin v0.4.15
+git tag -a v0.4.16 -m "Veirune v0.4.16"
+git push origin v0.4.16
 ```
 
-Дождись успешного релиза GitHub и обнови клиент на ПК до 0.4.15.
+Дождись успешного релиза GitHub и обнови клиент на ПК до 0.4.16.
 
 ## 3. Установить APK на Honor
 
-Файл для установки: `D:\projects\fastcloud-mobile\release\Veirune-Mobile-0.1.0.apk`.
+Файл для установки: `D:\projects\fastcloud-mobile\release\Veirune-Mobile-0.1.1.apk`.
 Перенеси его на телефон и открой. Разреши установку из файлового приложения, если Android попросит. В Veirune выбери **Подключить с ПК**; код с телефона введи в **Настройки → Аккаунт → Подключить телефон** на ПК и подтверди тот же SoundCloud-аккаунт в браузере. Код действует 10 минут. Телефон получает отдельную сессию; вход на ПК сохраняется.
 
 Проверь музыку с выключенным VPN телефона, экран блокировки, переходы и синхронизацию по [списку проверок](verification.md). Эти проверки требуют настоящего устройства и ещё не выполнены на Honor.
@@ -81,8 +81,8 @@ powershell -NoProfile -File tools/configure-github-signing.ps1
 
 ```powershell
 cd D:\projects\fastcloud-mobile
-git tag -a v0.1.0 -m "Veirune Mobile v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "Veirune Mobile v0.1.1"
+git push origin v0.1.1
 ```
 
 Workflow release.yml собирает APK тем же ключом, проверяет его пакет/версию/подпись, публикует APK, `latest-android.json` и RU/EN изменения. Следующие версии появятся внутри приложения. При установке Android попросит разрешение и подтверждение; данные сохраняются при установке поверх приложения.
@@ -93,14 +93,14 @@ Workflow release.yml собирает APK тем же ключом, провер
 
 ```powershell
 cd D:\projects\fastcloud-mobile
-python tools/bump-version.py 0.1.1 --ru "Описание изменения" --en "Description of the change"
+python tools/bump-version.py 0.1.2 --ru "Описание изменения" --en "Description of the change"
 npm run apk
 python tools/stage-android-release.py
 git add .
-git commit -m "fix: mobile improvements; release 0.1.1"
+git commit -m "fix: mobile improvements; release 0.1.2"
 git push origin main
-git tag -a v0.1.1 -m "Veirune Mobile v0.1.1"
-git push origin v0.1.1
+git tag -a v0.1.2 -m "Veirune Mobile v0.1.2"
+git push origin v0.1.2
 ```
 
 `bump-version.py` обновляет package/lock, iOS версию/номер сборки и отдельные мобильные RU/EN заметки. Android берёт версию из package.json. Десктопный latest.json не используется мобильным клиентом.
@@ -157,3 +157,7 @@ iOS использует системные альтернативные зна�
 gh repo edit COMF2222/fastcloud --description "Veirune — SoundCloud player for Windows and macOS: lyrics, themes, recommendations" --homepage "https://fastcloud.comf.workers.dev/"
 gh repo edit COMF2222/fastcloud-mobile --description "Veirune Mobile — Android player with a shared iOS foundation" --homepage "https://fastcloud.comf.workers.dev/#mobile"
 ```
+
+Проверка релиза принимает форматы apksigner 36 и 37 и сверяет сертификат с
+`android/release-certificate.sha256`. Это публичный отпечаток, а не секрет.
+Не создавай новый ключ для исправления CI: иначе обновления установленного APK не заработают.
