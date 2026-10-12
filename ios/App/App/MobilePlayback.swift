@@ -146,7 +146,7 @@ import UIKit
         let seconds = max(0, min(8, ((preferences["crossfade_ms"] as? NSNumber)?.doubleValue ?? 0) / 1000))
         guard !handoffRunning, seconds > 0, queue.indices.contains(index + 1), player.rate > 0, repeatMode != 1, UserDefaults.standard.double(forKey: "sleep") == 0 else { return }
         if let fadeStart, let secondary {
-            let progress = max(0, min(1, (player.currentTime().seconds - fadePosition) / max(.1, fadeDuration)))
+            let progress = max(0, min(1, (player.currentTime().seconds - fadePosition) / max(0.1, fadeDuration)))
             player.volume = Float(cos(progress * .pi / 2)); secondary.volume = Float(sin(progress * .pi / 2))
             if progress >= 1 { finishFade() }
             return
@@ -190,7 +190,7 @@ import UIKit
         case "jump": try await play(queue, at: selected)
         case "shuffle": shuffle.toggle(); if queue.indices.contains(index + 1) { let suffix = queue[(index + 1)...].shuffled(); queue = Array(queue[...index]) + suffix; rebuildUpcoming() }
         case "repeat": repeatMode = (repeatMode + 1) % 3
-        case "speed": speed = Float(max(.5, min(2, value))); if player.rate > 0 { player.rate = speed }; if secondary?.rate ?? 0 > 0 { secondary?.rate = speed }
+        case "speed": speed = Float(max(0.5, min(2, value))); if player.rate > 0 { player.rate = speed }; if secondary?.rate ?? 0 > 0 { secondary?.rate = speed }
         case "volume": player.volume = Float(max(0, min(1, value)))
         case "remove": guard queue.indices.contains(selected) else { return }; if selected == index { queue.remove(at: selected); if !queue.isEmpty { try await play(queue, at: min(index, queue.count - 1)) } else { stop() } } else { queue.remove(at: selected); if selected < index { index -= 1 }; rebuildUpcoming() }
         case "move": guard queue.indices.contains(selected), queue.indices.contains(target), selected != index, target != index else { return }; let track = queue.remove(at: selected); queue.insert(track, at: target); rebuildUpcoming()
