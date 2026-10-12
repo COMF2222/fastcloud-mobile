@@ -48,7 +48,7 @@ def stage(apk,output):
     output.mkdir(parents=True,exist_ok=True)
     name=f'Veirune-Mobile-{version}.apk';shutil.copy2(apk,output/name)
     with apk.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
-    info={'version':version,'build':build,'packageId':identity[1],'bytes':apk.stat().st_size,'sha256':digest,'signatureSha256':certificate,'url':f'https://github.com/COMF2222/fastcloud-mobile/releases/download/{tag}/{name}','notes':{language:note[language]['changes'] for language in ('ru','en')}}
+    info={'version':version,'build':build,'packageId':identity[1],'bytes':apk.stat().st_size,'sha256':digest,'signatureSha256':certificate,'url':f'https://github.com/COMF2222/veirune-mobile/releases/download/{tag}/{name}','notes':{language:note[language]['changes'] for language in ('ru','en')}}
     (output/'latest-android.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (output/'notes.md').write_text('# '+note['ru']['title']+'\n\n'+'\n'.join('- '+value for value in note['ru']['changes'])+'\n\n# '+note['en']['title']+'\n\n'+'\n'.join('- '+value for value in note['en']['changes'])+'\n',encoding='utf-8')
     print(f'Verified mobile {version}, build {build}, {apk.stat().st_size} bytes; signed release ready')

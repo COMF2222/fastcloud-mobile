@@ -1,6 +1,6 @@
 # Установка и публикация Veirune Mobile
 
-Приложение называется **Veirune**. Идентификаторы пакетов, домен, адреса репозиториев и ключи подписи сохраняются для совместимости.
+Приложение называется **Veirune**. Идентификаторы пакетов, домен и ключи подписи сохраняются для совместимости. Репозитории переименованы в `veirune`, `veirune-backend`, `veirune-mobile` и `veirune-website`; локальные папки пока сохраняют прежние имена.
 
 Подготовлены мобильный клиент **0.1.2**, помощь со входом с ПК в desktop **0.4.16** и серверные изменения. Десктопные изменения подготовлены поверх исходников **0.4.14**; существующие теги и опубликованные манифесты не изменены. Ничего не отправлено на GitHub и сервер автоматически.
 
@@ -18,7 +18,7 @@ ssh fastcloud "cd ~/fastcloud-backend && git pull --ff-only && bash deploy_check
 
 Дождись `Backend health verified`. Скрипт выполняет проверку базы и резервное копирование. При первой сборке образа дополнительно компилируется Rust-поиск текстов.
 
-Сервер по умолчанию смотрит публичные релизы `COMF2222/fastcloud-mobile`. Новый секрет для мобильного клиента не нужен. До первого релиза обновления отсутствуют — это нормальное состояние. Метаданные кэшируются на 2 минуты; клиент проверяет при запуске, возвращении в приложение и раз в 30 минут, а также вручную в настройках.
+Сервер по умолчанию смотрит публичные релизы `COMF2222/veirune-mobile`. Новый секрет для мобильного клиента не нужен. До первого релиза обновления отсутствуют — это нормальное состояние. Метаданные кэшируются на 2 минуты; клиент проверяет при запуске, возвращении в приложение и раз в 30 минут, а также вручную в настройках.
 
 ## 2. Выпустить помощь со входом на телефоне
 
@@ -55,7 +55,7 @@ git commit -m "feat: Veirune Android client, icon selection and shared iOS found
 git push -u origin main
 ```
 
-Remote уже настроен на `https://github.com/COMF2222/fastcloud-mobile.git`. Репозиторий должен быть публичным для скачивания APK сервером. CI проверяет Android и собирает iOS на Mac; тестовый APK из checks.yml подписан отладочным ключом и не предназначен для обновления установленного релизного APK.
+Remote уже настроен на `https://github.com/COMF2222/veirune-mobile.git`. Репозиторий должен быть публичным для скачивания APK сервером. CI проверяет Android и собирает iOS на Mac; тестовый APK из checks.yml подписан отладочным ключом и не предназначен для обновления установленного релизного APK.
 
 ## 5. Один раз настроить подпись GitHub
 
@@ -75,7 +75,7 @@ cd D:\projects\fastcloud-mobile
 powershell -NoProfile -File tools/configure-github-signing.ps1
 ```
 
-Последняя команда отправит четыре секрета подписи только в `COMF2222/fastcloud-mobile`: `FASTCLOUD_ANDROID_KEYSTORE_BASE64`, `FASTCLOUD_ANDROID_STORE_PASSWORD`, `FASTCLOUD_ANDROID_KEY_ALIAS`, `FASTCLOUD_ANDROID_KEY_PASSWORD`. Скрипт не выводит значения. Это делает владелец; автоматически секреты не передавались.
+Последняя команда отправит четыре секрета подписи только в `COMF2222/veirune-mobile`: `FASTCLOUD_ANDROID_KEYSTORE_BASE64`, `FASTCLOUD_ANDROID_STORE_PASSWORD`, `FASTCLOUD_ANDROID_KEY_ALIAS`, `FASTCLOUD_ANDROID_KEY_PASSWORD`. Скрипт не выводит значения. Это делает владелец; автоматически секреты не передавались.
 
 ## 6. Опубликовать первый Android-релиз после проверки телефона
 
@@ -154,8 +154,8 @@ iOS использует системные альтернативные зна�
 При желании обновить публичное описание GitHub, сохранив рабочие адреса репозиториев:
 
 ```powershell
-gh repo edit COMF2222/fastcloud --description "Veirune — SoundCloud player for Windows and macOS: lyrics, themes, recommendations" --homepage "https://fastcloud.comf.workers.dev/"
-gh repo edit COMF2222/fastcloud-mobile --description "Veirune Mobile — Android player with a shared iOS foundation" --homepage "https://fastcloud.comf.workers.dev/#mobile"
+gh repo edit COMF2222/veirune --description "Veirune — SoundCloud player for Windows and macOS: lyrics, themes, recommendations" --homepage "https://fastcloud.comf.workers.dev/"
+gh repo edit COMF2222/veirune-mobile --description "Veirune Mobile — Android player with a shared iOS foundation" --homepage "https://fastcloud.comf.workers.dev/#mobile"
 ```
 
 Проверка релиза принимает форматы apksigner 36 и 37 и сверяет сертификат с
