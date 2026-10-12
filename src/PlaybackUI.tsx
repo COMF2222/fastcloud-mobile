@@ -1,4 +1,5 @@
 import { lockPageScroll } from "./modalScroll";
+import { usePlayerSwipe } from "./usePlayerSwipe";
 import { useEffect, useRef, useState } from "react";
 import {
   Play,
@@ -37,11 +38,14 @@ export function MiniPlayer() {
   const state = usePlayer((s) => s.state),
     expanded = usePlayer((s) => s.expanded);
   const track = state.queue[state.index];
+  const swipe = usePlayerSwipe(track?.id, action => void run(() => control(action === "previous" ? "previous_track" : action)));
   if (!track || expanded) return null;
   return (
     <div className="mini-player">
       <button
         className="mini-main"
+        {...swipe}
+        aria-label={t("Открыть плеер", "Open player")}
         onClick={() => usePlayer.setState({ expanded: true })}
       >
         <RemoteImage src={track.artwork_url} className="artwork" />
@@ -70,6 +74,9 @@ export function MiniPlayer() {
           <Play fill="currentColor" size={22} />
         )}
       </button>
+      <button className="icon-button" aria-label={t("Следующий", "Next")} onClick={() => void run(() => control("next"))}>
+        <SkipForward size={20} fill="currentColor" />
+      </button>
       <div
         className="mini-progress"
         style={{
@@ -83,6 +90,7 @@ export function FullPlayer() {
   const t = useText();
   const state = usePlayer((s) => s.state);
   const track = state.queue[state.index];
+  const swipe = usePlayerSwipe(track?.id, action => void run(() => control(action === "previous" ? "previous_track" : action)));
   const [tab, setTab] = useState("cover"),
     [settings, setSettings] = useState(false),
     [sleep, setSleep] = useState(false);
@@ -161,11 +169,12 @@ export function FullPlayer() {
           </button>
         ))}
       </div>
-      <div className="player-content">
+      <div className="player-content" {...swipe}>
         {tab === "cover" ? (
           <RemoteImage
             src={track.artwork_url || track.artwork?.["500x500"]}
             className="player-cover"
+            pixels={1080}
           />
         ) : tab === "lyrics" ? (
           <Lyrics track={track} />

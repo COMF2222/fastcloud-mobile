@@ -490,6 +490,7 @@ public class FastcloudPlugin extends Plugin {
           }
           case "pause" -> p.pause();
           case "next" -> p.seekToNextMediaItem();
+          case "previous_track" -> p.seekToPreviousMediaItem();
           case "previous" -> {
             if (p.getCurrentPosition() > 3000) p.seekTo(0);
             else p.seekToPreviousMediaItem();

@@ -2,6 +2,25 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.3",
+      "ru": {
+        "title": "Veirune Mobile 0.1.3",
+        "changes": [
+          "Исправлен сбой запуска музыки в Android-плеере.",
+          "Добавлено переключение треков свайпом в большом и мини-плеере; в мини-плеере появилась кнопка следующего трека.",
+          "Добавлена плавная анимация свайпов и улучшена чёткость обложек в плеере и библиотеке."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.3",
+        "changes": [
+          "Fixed music failing to start in the Android player.",
+          "Added track switching by swipe in the full and mini players, plus a Next button in the mini player.",
+          "Added smooth swipe animations and sharper artwork in the player and library."
+        ]
+      }
+    },
+    {
       "version": "0.1.2",
       "ru": {
         "title": "Veirune Mobile 0.1.2",

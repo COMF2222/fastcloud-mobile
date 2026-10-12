@@ -561,6 +561,7 @@ export function PlaylistPage() {
         <RemoteImage
           src={list.artwork_url || tracks[0]?.artwork_url}
           className="large-cover"
+          pixels={1080}
         />
         <small>
           {list.is_album ? t("Альбом", "Album") : t("Плейлист", "Playlist")}
@@ -805,7 +806,7 @@ export function Profile() {
   return (
     <>
       <div className="profile-hero">
-        <RemoteImage src={me?.avatar_url} className="profile-cover" />
+        <RemoteImage src={me?.avatar_url} className="profile-cover" pixels={500} />
         <p className="eyebrow">YOUR VEIRUNE</p>
         <h1>{me?.username}</h1>
       </div>

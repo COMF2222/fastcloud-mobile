@@ -155,11 +155,21 @@ export const api = {
     }>(`/v1/leaderboard?days=${days}&sort=${sort}`),
 };
 const imageCache = new Map<string, string>();
+const imageFlights = new Map<string, Promise<string>>();
+let imageBytes = 0;
 export async function artwork(raw: string): Promise<string> {
   if (preview) return raw;
   if (imageCache.has(raw)) return imageCache.get(raw)!;
   if (!/^https:\/\/i[1-4]\.sndcdn\.com\//.test(raw))
     throw Error("Invalid artwork");
+  const pending = imageFlights.get(raw);
+  if (pending) return pending;
+  const load = loadArtwork(raw);
+  imageFlights.set(raw, load);
+  try { return await load; }
+  finally { imageFlights.delete(raw); }
+}
+async function loadArtwork(raw: string): Promise<string> {
   const response = await native.request({
     path: "/v1/soundcloud/artwork",
     method: "POST",
@@ -168,8 +178,12 @@ export async function artwork(raw: string): Promise<string> {
   });
   if (response.status !== 200) throw Error("Artwork unavailable");
   const result = `data:${response.contentType || "image/jpeg"};base64,${response.data}`;
-  if (imageCache.size > 250) imageCache.delete(imageCache.keys().next().value!);
-  imageCache.set(raw, result);
+  while (imageCache.size && (imageCache.size >= 128 || imageBytes + result.length * 2 > 16 * 1024 * 1024)) {
+    const key = imageCache.keys().next().value!;
+    imageBytes -= imageCache.get(key)!.length * 2;
+    imageCache.delete(key);
+  }
+  if (result.length * 2 <= 16 * 1024 * 1024) { imageCache.set(raw, result); imageBytes += result.length * 2; }
   return result;
 }
 export const publicUrl = (path: string) => new URL(path, server).href;

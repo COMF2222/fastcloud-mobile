@@ -15,7 +15,7 @@ npm run apk
 Install on Android 7 or newer. On this owner's Windows machine, `npm run apk`
 uses the persistent private signing key created in `%LOCALAPPDATA%/Fastcloud/mobile-signing`.
 Run `python tools/stage-android-release.py` to verify and stage
-`release/Veirune-Mobile-0.1.2.apk`. Without a configured key, the build helper
+`release/Veirune-Mobile-0.1.3.apk`. Without a configured key, the build helper
 produces a debug APK for development only. Never commit signing keys or passwords.
 
 ```powershell

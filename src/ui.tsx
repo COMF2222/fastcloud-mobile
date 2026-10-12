@@ -14,6 +14,7 @@ import {
   Radio,
 } from "lucide-react";
 import { api, artwork } from "./client";
+import { artworkCandidates } from "./artworkQuality";
 import { native } from "./native";
 import { dislike, useCloud } from "./cloud";
 import { useApp, go, run, notify, toggleLike } from "./state";
@@ -56,27 +57,41 @@ export function RemoteImage({
   src,
   alt = "",
   className = "",
+  pixels = 200,
 }: {
   src?: string | null;
   alt?: string;
   className?: string;
+  pixels?: number;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
+    let highReady = false;
     setUrl(null);
+    if (src && pixels > 500) void artwork(artworkCandidates(src, 200)[0]).then(value => {
+      if (alive && !highReady) setUrl(value);
+    }).catch(() => {});
     if (src)
-      void artwork(src)
+      void (async () => {
+        for (const candidate of artworkCandidates(src, pixels)) {
+          if (!alive) return null;
+          try { return await artwork(candidate); }
+          catch { /* Try a supported smaller rendition if the original is absent. */ }
+        }
+        return null;
+      })()
         .then((value) => {
-          if (alive) setUrl(value);
+          highReady = true;
+          if (alive && value) setUrl(value);
         })
         .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [src]);
+  }, [src, pixels]);
   return url ? (
-    <img className={className} src={url} alt={alt} loading="lazy" />
+    <img className={className} src={url} alt={alt} loading={pixels > 500 ? "eager" : "lazy"} decoding="async" draggable={false} />
   ) : (
     <span className={"image-placeholder " + className}>
       <Music2 size={22} />
@@ -388,6 +403,7 @@ export function PlaylistCards({ lists }: { lists: Playlist[] }) {
           <RemoteImage
             src={list.artwork_url || list.tracks?.[0]?.artwork_url}
             className="cover"
+            pixels={500}
           />
           <strong>{list.title}</strong>
           <small>

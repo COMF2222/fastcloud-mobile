@@ -187,6 +187,7 @@ import UIKit
         case "seek": cancelFade(); await player.seek(to: CMTime(seconds: max(0, value / 1000), preferredTimescale: 1000)); previousPosition = value / 1000
         case "next": cancelFade(); if queue.indices.contains(index + 1) { try await play(queue, at: index + 1) }
         case "previous": cancelFade(); if player.currentTime().seconds > 3 { await player.seek(to: .zero) } else { try await play(queue, at: max(0, index - 1)) }
+        case "previous_track": cancelFade(); try await play(queue, at: max(0, index - 1))
         case "jump": try await play(queue, at: selected)
         case "shuffle": shuffle.toggle(); if queue.indices.contains(index + 1) { let suffix = queue[(index + 1)...].shuffled(); queue = Array(queue[...index]) + suffix; rebuildUpcoming() }
         case "repeat": repeatMode = (repeatMode + 1) % 3

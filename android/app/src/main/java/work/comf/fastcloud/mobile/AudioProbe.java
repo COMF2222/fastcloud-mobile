@@ -36,6 +36,9 @@ final class AudioProbe extends BaseAudioProcessor {
 
   @Override
   public synchronized void queueInput(ByteBuffer input) {
+    // Media3 drains the pipeline with EMPTY_BUFFER, which is also the base
+    // processor's initial output buffer. Copying it into itself throws.
+    if (!input.hasRemaining()) return;
     ByteBuffer view = input.duplicate().order(ByteOrder.LITTLE_ENDIAN);
     while (view.remaining() >= 2 && samples < limit) {
       double sample = view.getShort() / 32768.0;

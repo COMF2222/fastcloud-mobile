@@ -62,7 +62,7 @@ export async function control(
     const s = { ...usePlayer.getState().state };
     if (action === "toggle") s.playing = !s.playing;
     if (action === "next") s.index = Math.min(s.index + 1, s.queue.length - 1);
-    if (action === "previous") s.index = Math.max(0, s.index - 1);
+    if (action === "previous" || action === "previous_track") s.index = Math.max(0, s.index - 1);
     if (action === "jump") s.index = index || 0;
     if (action === "seek") s.positionMs = value || 0;
     if (action === "shuffle") s.shuffle = !s.shuffle;

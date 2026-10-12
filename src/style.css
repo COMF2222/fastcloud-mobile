@@ -515,6 +515,7 @@ main > h2 {
   box-shadow: 0 4px 24px #0004;
 }
 .mini-main {
+  touch-action: pan-y pinch-zoom;
   flex: 1;
   min-width: 0;
   padding: 0;
@@ -523,6 +524,13 @@ main > h2 {
   justify-content: flex-start;
   gap: 10px;
 }
+.swipe-surface {
+  transform: translate3d(var(--track-swipe-x, 0px), 0, 0);
+  transition: transform 220ms cubic-bezier(.2,.75,.25,1), opacity 180ms ease;
+}
+.swipe-surface.swipe-dragging { transition: none; }
+.swipe-surface[data-swipe-phase="out"] { opacity: .45; }
+.swipe-surface[data-swipe-phase="in"] { opacity: .65; transition: none; }
 .mini-main .artwork {
   width: 42px;
   height: 42px;
@@ -1154,6 +1162,7 @@ progress {
   font-size: 0.8rem;
 }
 .player-content {
+  touch-action: pan-y pinch-zoom;
   flex: 1;
   min-height: 0;
   overflow: hidden;

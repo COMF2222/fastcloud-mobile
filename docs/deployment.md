@@ -2,7 +2,7 @@
 
 Приложение называется **Veirune**. Идентификаторы пакетов, домен и ключи подписи сохраняются для совместимости. Репозитории переименованы в `veirune`, `veirune-backend`, `veirune-mobile` и `veirune-website`; локальные папки пока сохраняют прежние имена.
 
-Подготовлены мобильный клиент **0.1.2**, помощь со входом с ПК в desktop **0.4.16** и серверные изменения. Десктопные изменения подготовлены поверх исходников **0.4.14**; существующие теги и опубликованные манифесты не изменены. Ничего не отправлено на GitHub и сервер автоматически.
+Подготовлены мобильный клиент **0.1.3**, помощь со входом с ПК в desktop **0.4.16** и серверные изменения. Десктопные изменения подготовлены поверх исходников **0.4.14**; существующие теги и опубликованные манифесты не изменены. Ничего не отправлено на GitHub и сервер автоматически.
 
 ## 1. Обновить сервер
 
@@ -41,7 +41,7 @@ git push origin v0.4.16
 
 ## 3. Установить APK на Honor
 
-Файл для установки: `D:\projects\fastcloud-mobile\release\Veirune-Mobile-0.1.2.apk`.
+Файл для установки: `D:\projects\fastcloud-mobile\release\Veirune-Mobile-0.1.3.apk`.
 Перенеси его на телефон и открой. Разреши установку из файлового приложения, если Android попросит. В Veirune выбери **Подключить с ПК**; код с телефона введи в **Настройки → Аккаунт → Подключить телефон** на ПК и подтверди тот же SoundCloud-аккаунт в браузере. Код действует 10 минут. Телефон получает отдельную сессию; вход на ПК сохраняется.
 
 Проверь музыку с выключенным VPN телефона, экран блокировки, переходы и синхронизацию по [списку проверок](verification.md). Эти проверки требуют настоящего устройства и ещё не выполнены на Honor.
@@ -77,12 +77,12 @@ powershell -NoProfile -File tools/configure-github-signing.ps1
 
 Последняя команда отправит четыре секрета подписи только в `COMF2222/veirune-mobile`: `FASTCLOUD_ANDROID_KEYSTORE_BASE64`, `FASTCLOUD_ANDROID_STORE_PASSWORD`, `FASTCLOUD_ANDROID_KEY_ALIAS`, `FASTCLOUD_ANDROID_KEY_PASSWORD`. Скрипт не выводит значения. Это делает владелец; автоматически секреты не передавались.
 
-## 6. Опубликовать первый Android-релиз после проверки телефона
+## 6. Опубликовать Android 0.1.3 после проверки телефона
 
 ```powershell
 cd D:\projects\fastcloud-mobile
-git tag -a v0.1.2 -m "Veirune Mobile v0.1.2"
-git push origin v0.1.2
+git tag -a v0.1.3 -m "Veirune Mobile v0.1.3"
+git push origin v0.1.3
 ```
 
 Workflow release.yml собирает APK тем же ключом, проверяет его пакет/версию/подпись, публикует APK, `latest-android.json` и RU/EN изменения. Следующие версии появятся внутри приложения. При установке Android попросит разрешение и подтверждение; данные сохраняются при установке поверх приложения.
@@ -93,14 +93,14 @@ Workflow release.yml собирает APK тем же ключом, провер
 
 ```powershell
 cd D:\projects\fastcloud-mobile
-python tools/bump-version.py 0.1.3 --ru "Описание изменения" --en "Description of the change"
+python tools/bump-version.py 0.1.4 --ru "Описание изменения" --en "Description of the change"
 npm run apk
 python tools/stage-android-release.py
 git add .
-git commit -m "fix: mobile improvements; release 0.1.3"
+git commit -m "fix: mobile improvements; release 0.1.4"
 git push origin main
-git tag -a v0.1.3 -m "Veirune Mobile v0.1.3"
-git push origin v0.1.3
+git tag -a v0.1.4 -m "Veirune Mobile v0.1.4"
+git push origin v0.1.4
 ```
 
 `bump-version.py` обновляет package/lock, iOS версию/номер сборки и отдельные мобильные RU/EN заметки. Android берёт версию из package.json. Десктопный latest.json не используется мобильным клиентом.
