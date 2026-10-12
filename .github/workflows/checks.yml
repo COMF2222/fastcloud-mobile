@@ -1,0 +1,49 @@
+name: Mobile checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npm run check && npm test
+      - run: npm run build && npx cap sync android
+      - run: chmod +x android/gradlew
+      - run: node tools/build-android.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Veirune-Mobile-Android-test
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          compression-level: 0
+  ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build && npx cap sync ios
+      - name: Compile the iOS simulator application
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build

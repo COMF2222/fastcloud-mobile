@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "releases": [
+    {
+      "version": "0.1.0",
+      "ru": {
+        "title": "Veirune теперь на Android",
+        "changes": [
+          "Музыка SoundCloud через сервер, фоновое воспроизведение и управление с экрана блокировки.",
+          "Вход по коду с ПК, общие лайки, плейлисты, настройки, дизлайки и статистика.",
+          "Мобильный плеер, тексты песен, комментарии, сообщения, импорт музыки и офлайн-треки.",
+          "Обновления внутри приложения с сохранением данных.",
+          "Основной значок — Луна. В настройках можно выбрать один из 12 значков для своего устройства."
+        ]
+      },
+      "en": {
+        "title": "Veirune comes to Android",
+        "changes": [
+          "SoundCloud music through the server, background playback and lock-screen controls.",
+          "PC-assisted sign-in with shared likes, playlists, settings, dislikes and listening statistics.",
+          "Mobile player, lyrics, comments, messages, music imports and offline tracks.",
+          "In-app updates that preserve your data.",
+          "Moon is the default icon. Choose from 12 app icons in settings for your device."
+        ]
+      }
+    }
+  ]
+}
