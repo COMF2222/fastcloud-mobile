@@ -2,6 +2,25 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.2",
+      "ru": {
+        "title": "Veirune Mobile 0.1.2",
+        "changes": [
+          "Исправлена синхронизация аккаунта на Android и ложное сообщение об отсутствии соединения.",
+          "Исправлено ожидание подготовки аудио; ошибки воспроизведения стали понятнее.",
+          "Во время загрузки трека плеер показывает ожидание, а после ошибки кнопка «Играть» повторяет запуск."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.2",
+        "changes": [
+          "Fixed Android account synchronization and the incorrect offline message.",
+          "Fixed audio preparation timeouts and improved playback error details.",
+          "The player shows when a track is loading, and Play retries playback after an error."
+        ]
+      }
+    },
+    {
       "version": "0.1.1",
       "ru": {
         "title": "Veirune Mobile 0.1.1",

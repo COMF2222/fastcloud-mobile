@@ -235,7 +235,10 @@ final class Gateway {
     ).openConnection();
     connection.setInstanceFollowRedirects(false);
     connection.setConnectTimeout(15000);
-    connection.setReadTimeout(path.equals("/v1/mobile/lyrics") ? 90000 : 45000);
+    // Cold audio resolution can outlast an ordinary metadata request.
+    connection.setReadTimeout(
+      path.equals("/v1/mobile/lyrics") || path.equals("/v1/media/resolve") ? 90000 : 45000
+    );
     connection.setRequestMethod(method);
     connection.setRequestProperty("X-Fastcloud-Preferences", "2");
     connection.setRequestProperty("Accept", "application/json");

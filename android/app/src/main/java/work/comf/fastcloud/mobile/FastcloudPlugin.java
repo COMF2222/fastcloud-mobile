@@ -406,6 +406,17 @@ public class FastcloudPlugin extends Plugin {
     });
   }
 
+  private static String playbackError(androidx.media3.common.PlaybackException error) {
+    for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+      if (cause instanceof java.net.SocketTimeoutException) return "Server timed out while preparing audio";
+      if (cause instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException http) {
+        return "Audio request failed: HTTP " + http.responseCode;
+      }
+      if (cause instanceof java.net.ConnectException) return "Could not connect to the audio server";
+    }
+    return "Playback failed: " + error.getErrorCodeName();
+  }
+
   @PluginMethod
   public void player(PluginCall call) {
     withPlayer(call, p -> {
@@ -424,7 +435,7 @@ public class FastcloudPlugin extends Plugin {
         new JSObject()
           .put("queue", queue)
           .put("index", p.getCurrentMediaItemIndex())
-          .put("playing", p.isPlaying())
+          .put("playing", p.getPlayWhenReady() && p.getPlayerError() == null && p.getPlaybackState() != Player.STATE_ENDED)
           .put("loading", p.getPlaybackState() == Player.STATE_BUFFERING)
           .put("positionMs", Math.max(0, p.getCurrentPosition()))
           .put("durationMs", duration < 0 ? 0 : duration)
@@ -435,7 +446,7 @@ public class FastcloudPlugin extends Plugin {
             "error",
             p.getPlayerError() == null
               ? JSONObject.NULL
-              : p.getPlayerError().getMessage()
+              : playbackError(p.getPlayerError())
           )
       );
     });
@@ -462,18 +473,16 @@ public class FastcloudPlugin extends Plugin {
     withPlayer(call, p -> {
       try {
         String action = call.getString("action", "");
-        double value = call.getDouble("value", 0.0);
+        double value = BridgeNumbers.number(call.getData().opt("value"), 0);
         int index = call.getInt("index", 0);
         switch (action) {
           case "toggle" -> {
-            if (p.getPlayWhenReady()) p.pause();
-            else {
-              if (
-                p.getPlayerError() != null ||
-                p.getPlaybackState() == Player.STATE_IDLE
-              ) p.prepare();
+            if (p.getPlayerError() != null || p.getPlaybackState() == Player.STATE_IDLE || p.getPlaybackState() == Player.STATE_ENDED) {
+              if (p.getPlaybackState() == Player.STATE_ENDED) p.seekTo(0);
+              p.prepare();
               p.play();
-            }
+            } else if (p.getPlayWhenReady()) p.pause();
+            else p.play();
           }
           case "play" -> {
             if (p.getPlaybackState() == Player.STATE_IDLE) p.prepare();
@@ -526,7 +535,7 @@ public class FastcloudPlugin extends Plugin {
         JSONObject account = gateway.session();
         if (
           account == null ||
-          account.optLong("account_id") != call.getLong("accountId", 0L)
+          account.optLong("account_id") != BridgeNumbers.id(call.getData().opt("accountId"))
         ) throw new Exception("Account changed; retry the request");
         if (call.getArray("history") != null) getContext()
           .getSharedPreferences("playback", 0)
@@ -575,7 +584,7 @@ public class FastcloudPlugin extends Plugin {
   @PluginMethod
   public void removeDownload(PluginCall call) {
     background(call, () -> {
-      Offline.remove(getContext(), call.getLong("id", 0L));
+      Offline.remove(getContext(), BridgeNumbers.id(call.getData().opt("id")));
       call.resolve();
     });
   }

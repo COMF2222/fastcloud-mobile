@@ -62,7 +62,9 @@ export function MiniPlayer() {
         aria-label={state.playing ? t("Пауза", "Pause") : t("Играть", "Play")}
         onClick={() => void run(() => control("toggle"))}
       >
-        {state.playing ? (
+        {state.loading ? (
+          <span className="spinner" aria-hidden="true" />
+        ) : state.playing ? (
           <Pause fill="currentColor" size={22} />
         ) : (
           <Play fill="currentColor" size={22} />

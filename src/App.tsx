@@ -292,7 +292,7 @@ export default function App() {
           </header>
           {syncStatus === "offline" && (
             <div className="connection-banner" role="status">
-              {t("Нет соединения с сервером", "Server is offline")}
+              {t("Не удалось синхронизировать настройки", "Settings could not be synced")}
             </div>
           )}
           <main key={page}>

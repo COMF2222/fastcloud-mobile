@@ -49,7 +49,7 @@ public class PlaybackService extends MediaSessionService {
     listening = new Listening(this);
     var http = new DefaultHttpDataSource.Factory()
       .setConnectTimeoutMs(15000)
-      .setReadTimeoutMs(30000)
+      .setReadTimeoutMs(90000)
       .setAllowCrossProtocolRedirects(false);
     var base = new DefaultDataSource.Factory(this, http);
     sources = new ResolvingDataSource.Factory(base, spec -> {
