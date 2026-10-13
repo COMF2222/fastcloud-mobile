@@ -1,7 +1,8 @@
 import { Preferences as Storage } from "@capacitor/preferences";
 import { create } from "zustand";
 import { api } from "./client";
-import { native, nativePlatform } from "./native";
+import { native, nativePlatform, server } from "./native";
+import { recoverServerFields, LEGACY_SERVER } from './serverMigration';
 import {
   artist,
   emptyCloud,
@@ -21,6 +22,7 @@ import {
 const uuid = () => crypto.randomUUID().replace(/-/g, "");
 let account = 0,
   epoch = 0,
+  cacheServer = server,
   device = uuid(),
   dirty: Dirty = {},
   syncing: { epoch: number; promise: Promise<void> } | null = null,
@@ -31,7 +33,7 @@ export const useCloud = create<{ cloud: Cloud; status: string }>(() => ({
   status: "offline",
 }));
 function snapshot() {
-  return JSON.stringify({ device, cloud: useCloud.getState().cloud, dirty });
+  return JSON.stringify({ device, cloud: useCloud.getState().cloud, dirty, server: cacheServer });
 }
 function persist() {
   const key = `personal-${account}`,
@@ -44,6 +46,7 @@ function persist() {
 export async function activateCloud(id: number) {
   epoch++;
   account = id;
+  cacheServer = server;
   dirty = {};
   device = uuid();
   useCloud.setState({ cloud: emptyCloud(), status: "loading" });
@@ -59,6 +62,7 @@ export async function activateCloud(id: number) {
         cloud: { ...emptyCloud(), ...value.cloud },
         status: "cached",
       });
+      cacheServer = value.server || LEGACY_SERVER;
     } catch {
       /* Ignore a corrupt local cache; the server remains authoritative. */
     }
@@ -130,6 +134,10 @@ export function syncCloud(): Promise<void> {
   const promise = (async () => {
     try {
       let remote = await api.personal();
+      if (current !== epoch) return;
+      dirty = recoverServerFields(useCloud.getState().cloud, dirty, cacheServer, server, remote);
+      cacheServer = server;
+      await persist();
       if (current !== epoch) return;
       useCloud.setState({
         cloud: mergeCloud(remote, useCloud.getState().cloud, dirty),

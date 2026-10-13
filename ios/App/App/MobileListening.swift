@@ -16,6 +16,13 @@ actor MobileListening {
         UserDefaults.standard.set(device, forKey: prefix + "-device")
         rows = MobileLocal.dictionary(prefix + "-rows") as? [String: [String: Any]] ?? [:]
         synced = MobileLocal.dictionary(prefix + "-synced") as? [String: [String: Int64]] ?? [:]
+        let origin = UserDefaults.standard.string(forKey: "server") ?? "https://80.47.238.200"
+        let previous = UserDefaults.standard.string(forKey: prefix + "-server") ?? "https://77.223.107.226"
+        if owner > 0, previous == "https://77.223.107.226", origin == "https://80.47.238.200" {
+            synced = [:]
+            MobileLocal.save(synced, key: prefix + "-synced")
+        }
+        UserDefaults.standard.set(origin, forKey: prefix + "-server")
     }
     func add(_ track: [String: Any], ms: Int64, counted: Bool) throws {
         try load(); guard owner > 0, ms > 0, ms <= 2000, let id = track["id"] as? NSNumber else { return }

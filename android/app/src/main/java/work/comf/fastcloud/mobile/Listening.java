@@ -21,6 +21,10 @@ final class Listening {
     if (id == account) return;
     account = id;
     var prefs = context.getSharedPreferences("listening-" + account, 0);
+    String origin = new Gateway(context).server();
+    if (account > 0 && ServerMigration.restoring(prefs.getString("server", ServerMigration.LEGACY), origin)) {
+      prefs.edit().putString("synced", "{}").putString("server", origin).commit();
+    } else { prefs.edit().putString("server", origin).commit(); }
     device = prefs.getString("device", null);
     if (device == null) {
       device = UUID.randomUUID().toString().replace("-", "");

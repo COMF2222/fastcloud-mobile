@@ -2,6 +2,23 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.6",
+      "ru": {
+        "title": "Veirune Mobile 0.1.6",
+        "changes": [
+          "Подключение к новому серверу Veirune. После обновления войди снова или подключи телефон по коду с ПК.",
+          "Сохранённые на телефоне настройки и история прослушивания переносятся на новый сервер."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.6",
+        "changes": [
+          "Connect to the new Veirune server. Sign in again or pair your phone with your PC after updating.",
+          "Settings and listening history saved on this phone are recovered on the new server."
+        ]
+      }
+    },
+    {
       "version": "0.1.5",
       "ru": {
         "title": "Veirune Mobile 0.1.5",

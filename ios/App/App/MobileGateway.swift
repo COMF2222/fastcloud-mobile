@@ -74,7 +74,7 @@ actor MobileGateway {
         pairingTicket = nil
         return true
     }
-    var server: String { UserDefaults.standard.string(forKey: "server") ?? "https://77.223.107.226" }
+    var server: String { UserDefaults.standard.string(forKey: "server") ?? "https://80.47.238.200" }
     struct Response { let status: Int; let data: Data; let type: String
         func object() throws -> Any { if data.isEmpty { return NSNull() }; return try JSONSerialization.jsonObject(with: data) }
         func json() throws -> [String: Any] { guard let result = try object() as? [String: Any] else { throw MobileFailure.message("Invalid server response") }; return result }
@@ -82,7 +82,10 @@ actor MobileGateway {
     func configure(_ address: String) throws {
         guard let url = URLComponents(string: address), url.scheme == "https", url.host != nil, url.user == nil, url.password == nil, url.path.isEmpty, url.query == nil, url.fragment == nil else { throw MobileFailure.message("Use an HTTPS server address") }
         let existing = try MobileKeychain.read()
-        if address != server && existing != nil { throw MobileFailure.message("Sign out before changing server") }
+        if address != server && existing != nil {
+            if server == "https://77.223.107.226" && address == "https://80.47.238.200" { MobileKeychain.clear() }
+            else { throw MobileFailure.message("Sign out before changing server") }
+        }
         UserDefaults.standard.set(address, forKey: "server")
     }
     func raw(_ path: String, method: String = "GET", body: [String: Any]? = nil, token: String? = nil) async throws -> Response {

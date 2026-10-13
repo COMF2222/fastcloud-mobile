@@ -94,7 +94,7 @@ final class Gateway {
   String server() {
     return context
       .getSharedPreferences("mobile", 0)
-      .getString("server", "https://77.223.107.226");
+      .getString("server", ServerMigration.CURRENT);
   }
 
   void configure(String server) throws Exception {
@@ -106,9 +106,10 @@ final class Gateway {
       value.getQuery() != null ||
       value.getRef() != null
     ) throw new IOException("Use an HTTPS server address");
-    if (!server().equals(server) && session() != null) throw new IOException(
-      "Sign out before changing server"
-    );
+    if (!server().equals(server) && session() != null) {
+      if (ServerMigration.restoring(server(), server)) SecureStore.clear(context);
+      else throw new IOException("Sign out before changing server");
+    }
     context
       .getSharedPreferences("mobile", 0)
       .edit()

@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PlayerState, Track, Listen } from "./types";
 import type { MobileUpdate } from "./updates";
+import { CURRENT_SERVER } from './serverMigration';
 export interface NativeBridge {
   appIcon(options: {
     id?: number;
@@ -58,7 +59,7 @@ export const native = registerPlugin<NativeBridge>("Fastcloud");
 export const nativePlatform = Capacitor.isNativePlatform();
 export const supportsAudioEffects = Capacitor.getPlatform() !== "ios";
 export const server = (
-  import.meta.env.VITE_FASTCLOUD_SERVER_URL || "https://77.223.107.226"
+  import.meta.env.VITE_FASTCLOUD_SERVER_URL || CURRENT_SERVER
 ).replace(/\/+$/, "");
 export const preview =
   new URLSearchParams(location.search).get("demo") === "1" && !nativePlatform;
