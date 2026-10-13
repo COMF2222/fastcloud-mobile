@@ -2,6 +2,25 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.5",
+      "ru": {
+        "title": "Veirune Mobile 0.1.5",
+        "changes": [
+          "Волна по треку, альбому, плейлисту и артисту с продолжением очереди.",
+          "Карточки песен и переходы к артистам из большого плеера.",
+          "Быстрее загружаются библиотека и обложки; исправлены светлая тема и поиск плейлистов."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.5",
+        "changes": [
+          "Continuous radio from a track, album, playlist or artist.",
+          "Song details and artist navigation from the full player.",
+          "Faster library and artwork loading, readable light theme and corrected playlist search."
+        ]
+      }
+    },
+    {
       "version": "0.1.4",
       "ru": {
         "title": "Veirune Mobile 0.1.4",
