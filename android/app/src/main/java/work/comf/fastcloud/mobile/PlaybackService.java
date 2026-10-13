@@ -28,6 +28,14 @@ public class PlaybackService extends MediaSessionService {
   private androidx.media3.datasource.DataSource.Factory sources;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private final ExecutorService io = Executors.newSingleThreadExecutor();
+  private final ExecutorService radioIo = Executors.newFixedThreadPool(4);
+  private int radioVariation;
+  private String lastRadioContext = "";
+  private long lastRadioAttempt;
+  private String lastRadioAnchor = "";
+  private final ArrayDeque<RadioMixer.Entry<JSONObject>> radioHistory =
+    new ArrayDeque<>();
+  private boolean destroyed;
 
   private record Ticket(String url, long created) {}
 
@@ -569,15 +577,53 @@ public class PlaybackService extends MediaSessionService {
   }
 
   private void extend() {
+    MediaItem current = player.getCurrentMediaItem();
+    if (current == null) return;
+    String station =
+      current.mediaMetadata.extras == null
+        ? ""
+        : current.mediaMetadata.extras.getString("station", "");
+    long now = android.os.SystemClock.elapsedRealtime();
+    if (!station.isEmpty()) {
+      if (!station.equals(lastRadioContext)) {
+        lastRadioContext = station;
+        lastRadioAttempt = 0;
+        radioHistory.clear();
+      }
+      if (
+        lastRadioAttempt > 0 &&
+        now - lastRadioAttempt < 20000 &&
+        current.mediaId.equals(lastRadioAnchor)
+      ) return;
+    }
     if (
       extending ||
       player.getMediaItemCount() == 0 ||
-      !preferences().optBoolean("autoplay", true) ||
+      (station.isEmpty() && !preferences().optBoolean("autoplay", true)) ||
       getSharedPreferences("playback", 0).getLong("sleep", 0) > 0
     ) return;
-    MediaItem current = player.getCurrentMediaItem();
-    if (current == null) return;
     extending = true;
+    if (!station.isEmpty()) {
+      lastRadioAttempt = now;
+      lastRadioAnchor = current.mediaId;
+    }
+    if (!station.isEmpty()) {
+      current.mediaMetadata.extras.putBoolean("radio_loading", true);
+      current.mediaMetadata.extras.putBoolean("radio_error", false);
+    }
+    var previous = new ArrayList<>(radioHistory);
+    for (int i = 0; i < player.getMediaItemCount(); i++) {
+      try {
+        previous.add(
+          radioEntry(
+            new JSONObject(
+              player.getMediaItemAt(i).mediaMetadata.extras.getString("track")
+            )
+          )
+        );
+      } catch (Exception ignored) {}
+    }
+    int variation = radioVariation++;
     Set<String> used = new HashSet<>();
     for (int i = 0; i < player.getMediaItemCount(); i++) used.add(
       player.getMediaItemAt(i).mediaId
@@ -585,69 +631,363 @@ public class PlaybackService extends MediaSessionService {
     io.execute(() -> {
       var items = new ArrayList<MediaItem>();
       try {
-        JSONObject result = gateway.json(
-          "/v1/soundcloud/api/tracks/" +
-            java.net.URLEncoder.encode(
-              "soundcloud:tracks:" + current.mediaId,
-              "UTF-8"
-            ) +
-            "/related?limit=50&access=playable,preview",
-          "GET",
-          null
-        );
-        JSONArray collection = result.getJSONArray("collection");
-        var candidates = new ArrayList<JSONObject>();
-        for (int i = 0; i < collection.length(); i++) candidates.add(
-          collection.getJSONObject(i)
-        );
-        Collections.shuffle(candidates);
-        Map<Long, Integer> artists = new HashMap<>();
-        for (JSONObject track : candidates) {
-          if (!track.has("id")) track.put(
-            "id",
-            Long.parseLong(
-              track
-                .getString("urn")
-                .substring(track.getString("urn").lastIndexOf(':') + 1)
-            )
-          );
-          JSONObject user = track.optJSONObject("user");
-          long artist = user == null ? 0 : user.optLong("id");
-          if (
-            !used.contains(String.valueOf(track.getLong("id"))) &&
-            !blocked(track) &&
-            allowedRecommendation(
-              track,
-              current.mediaMetadata.extras.getBoolean("recommended", false)
-            ) &&
-            artists.getOrDefault(artist, 0) < 2
-          ) {
-            MediaItem value = FastcloudPlugin.item(track);
-            value.mediaMetadata.extras.putBoolean("recommended", true);
-            items.add(value);
-            used.add(String.valueOf(track.getLong("id")));
-            artists.put(artist, artists.getOrDefault(artist, 0) + 1);
+        if (!station.isEmpty()) {
+          for (var track : stationTracks(station, previous, variation)) {
+            var item = FastcloudPlugin.item(track);
+            item.mediaMetadata.extras.putBoolean("recommended", true);
+            item.mediaMetadata.extras.putString("station", station);
+            items.add(item);
           }
-          if (items.size() >= 12) break;
+        } else {
+          JSONObject result = gateway.json(
+            "/v1/soundcloud/api/tracks/" +
+              java.net.URLEncoder.encode(
+                "soundcloud:tracks:" + current.mediaId,
+                "UTF-8"
+              ) +
+              "/related?limit=50&access=playable,preview&linked_partitioning=true",
+            "GET",
+            null
+          );
+          JSONArray collection = result.getJSONArray("collection");
+          var candidates = new ArrayList<JSONObject>();
+          for (int i = 0; i < collection.length(); i++) candidates.add(
+            collection.getJSONObject(i)
+          );
+          Collections.shuffle(candidates);
+          Map<Long, Integer> artists = new HashMap<>();
+          for (JSONObject track : candidates) {
+            if (!track.has("id")) track.put(
+              "id",
+              Long.parseLong(
+                track
+                  .getString("urn")
+                  .substring(track.getString("urn").lastIndexOf(':') + 1)
+              )
+            );
+            JSONObject user = track.optJSONObject("user");
+            long artist = user == null ? 0 : user.optLong("id");
+            if (
+              !used.contains(String.valueOf(track.getLong("id"))) &&
+              !blocked(track) &&
+              allowedRecommendation(
+                track,
+                current.mediaMetadata.extras.getBoolean("recommended", false)
+              ) &&
+              artists.getOrDefault(artist, 0) < 2
+            ) {
+              MediaItem value = FastcloudPlugin.item(track);
+              value.mediaMetadata.extras.putBoolean("recommended", true);
+              items.add(value);
+              used.add(String.valueOf(track.getLong("id")));
+              artists.put(artist, artists.getOrDefault(artist, 0) + 1);
+            }
+            if (items.size() >= 12) break;
+          }
         }
       } catch (Exception ignored) {}
       handler.post(() -> {
-        if (
-          player.getCurrentMediaItem() != null &&
-          player.getCurrentMediaItem().mediaId.equals(current.mediaId)
-        ) {
+        if (destroyed) return;
+        MediaItem live = player.getCurrentMediaItem();
+        boolean sameQueue =
+          live != null &&
+          (station.isEmpty()
+            ? live == current
+            : live.mediaMetadata.extras != null &&
+              station.equals(
+                live.mediaMetadata.extras.getString("station", "")
+              ));
+        if (!station.isEmpty()) {
+          current.mediaMetadata.extras.putBoolean("radio_loading", false);
+          current.mediaMetadata.extras.putBoolean(
+            "radio_error",
+            items.isEmpty()
+          );
+          if (sameQueue) {
+            live.mediaMetadata.extras.putBoolean("radio_loading", false);
+            live.mediaMetadata.extras.putBoolean(
+              "radio_error",
+              items.isEmpty()
+            );
+          }
+        }
+        if (sameQueue) {
           boolean ended = player.getPlaybackState() == Player.STATE_ENDED;
           int last = player.getMediaItemCount();
+          Set<String> liveIds = new HashSet<>();
+          for (int i = 0; i < last; i++) liveIds.add(
+            player.getMediaItemAt(i).mediaId
+          );
+          items.removeIf(item -> {
+            try {
+              return (
+                !liveIds.add(item.mediaId) ||
+                blocked(
+                  new JSONObject(item.mediaMetadata.extras.getString("track"))
+                )
+              );
+            } catch (Exception error) {
+              return true;
+            }
+          });
           player.addMediaItems(items);
+          if (!station.isEmpty()) {
+            for (var item : items) {
+              try {
+                radioHistory.addLast(
+                  radioEntry(
+                    new JSONObject(item.mediaMetadata.extras.getString("track"))
+                  )
+                );
+              } catch (Exception ignored) {}
+            }
+            while (radioHistory.size() > 1000) radioHistory.removeFirst();
+          }
           if (ended && !items.isEmpty()) {
             player.seekToDefaultPosition(last);
             player.prepare();
             player.play();
           }
+          if (
+            !station.isEmpty() && player.getCurrentMediaItemIndex() > 120
+          ) player.removeMediaItems(0, player.getCurrentMediaItemIndex() - 15);
+          saveQueue();
         }
         extending = false;
       });
     });
+  }
+
+  private RadioMixer.Entry<JSONObject> radioEntry(JSONObject track)
+    throws Exception {
+    if (!track.has("id")) {
+      String urn = track.optString("urn");
+      track.put("id", Long.parseLong(urn.substring(urn.lastIndexOf(':') + 1)));
+    }
+    boolean playable =
+      !blocked(track) &&
+      !List.of("SNIP", "BLOCK").contains(track.optString("policy")) &&
+      !List.of("preview", "blocked").contains(track.optString("access"));
+    JSONObject metadata = track.optJSONObject("publisher_metadata"),
+      user = track.optJSONObject("user");
+    String artist = metadata == null ? "" : metadata.optString("artist");
+    if (artist.isBlank()) artist = track.optString("metadata_artist");
+    if (artist.isBlank()) artist =
+      user == null ? "" : user.optString("username");
+    return new RadioMixer.Entry<>(
+      track.optLong("id"),
+      comparable(track.optString("title")),
+      comparable(artist),
+      track.optLong("full_duration_ms", track.optLong("duration")),
+      playable,
+      track
+    );
+  }
+
+  private List<JSONObject> stationTracks(
+    String source,
+    List<RadioMixer.Entry<JSONObject>> previous,
+    int variation
+  ) throws Exception {
+    JSONObject context = new JSONObject(source);
+    JSONArray raw = context.getJSONArray("seeds");
+    var seeds = new ArrayList<RadioMixer.Entry<JSONObject>>();
+    for (int i = 0; i < Math.min(16, raw.length()); i++) {
+      var entry = radioEntry(raw.getJSONObject(i));
+      if (entry.playable()) seeds.add(entry);
+    }
+    if (seeds.isEmpty()) return List.of();
+    var origins = new HashSet<Long>();
+    for (var seed : seeds) origins.add(seed.id());
+    var frontier = new ArrayList<RadioMixer.Entry<JSONObject>>();
+    for (int i = previous.size() - 1; i >= 0 && frontier.size() < 2; i--) {
+      var row = previous.get(i);
+      if (
+        !origins.contains(row.id()) &&
+        row.playable() &&
+        frontier.stream().noneMatch(accepted -> accepted.id() == row.id())
+      ) frontier.add(row);
+    }
+    var querySeeds = new ArrayList<RadioMixer.Entry<JSONObject>>();
+    int originalCount = Math.min(frontier.isEmpty() ? 4 : 2, seeds.size());
+    for (int i = 0; i < originalCount; i++) querySeeds.add(
+      seeds.get(Math.floorMod(variation * originalCount + i, seeds.size()))
+    );
+    querySeeds.addAll(frontier);
+    var searches = new ArrayList<
+      java.util.concurrent.Future<List<RadioMixer.Entry<JSONObject>>>
+    >();
+    for (var querySeed : querySeeds) {
+      long id = querySeed.id();
+      searches.add(
+        radioIo.submit(() -> {
+          var response = gateway.json(
+            "/v1/soundcloud/api/tracks/soundcloud%3Atracks%3A" +
+              id +
+              "/related?limit=50&access=playable&linked_partitioning=true",
+            "GET",
+            null
+          );
+          var rows = response.getJSONArray("collection");
+          var page = new ArrayList<RadioMixer.Entry<JSONObject>>();
+          for (int j = 0; j < rows.length(); j++) page.add(
+            radioEntry(rows.getJSONObject(j))
+          );
+          return page;
+        })
+      );
+    }
+    long deadline =
+      System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(12);
+    var pages = new ArrayList<List<RadioMixer.Entry<JSONObject>>>();
+    for (var search : searches) {
+      try {
+        pages.add(
+          search.get(
+            Math.max(1, deadline - System.nanoTime()),
+            java.util.concurrent.TimeUnit.NANOSECONDS
+          )
+        );
+      } catch (Exception error) {
+        android.util.Log.w(
+          "VeiruneRadio",
+          "Related page unavailable: " + error.getClass().getSimpleName()
+        );
+        search.cancel(true);
+        pages.add(List.of());
+      }
+    }
+    var ownArtists = new HashSet<String>();
+    for (var seed : seeds) ownArtists.add(seed.artist());
+    long others = pages
+      .stream()
+      .flatMap(List::stream)
+      .filter(
+        row ->
+          row.playable() &&
+          !ownArtists.contains(row.artist()) &&
+          previous.stream().noneMatch(seen -> seen.id() == row.id())
+      )
+      .map(RadioMixer.Entry::artist)
+      .distinct()
+      .count();
+    if (others < 3) {
+      // Some related-track shelves contain almost only the source uploader.
+      // Ask SoundCloud for related profiles before broadening to the same genre.
+      JSONObject anchor = seeds.get(0).value(),
+        user = anchor.optJSONObject("user");
+      var profileSearches = new ArrayList<
+        java.util.concurrent.Future<List<RadioMixer.Entry<JSONObject>>>
+      >();
+      try {
+        if (
+          user != null &&
+          comparable(user.optString("username")).equals(seeds.get(0).artist())
+        ) {
+          var lookup = radioIo.submit(() ->
+            gateway.json(
+              "/v1/soundcloud/api/users/soundcloud%3Ausers%3A" +
+                user.optLong("id") +
+                "/related?linked_partitioning=true&limit=8",
+              "GET",
+              null
+            )
+          );
+          JSONObject relatedUsers;
+          try {
+            relatedUsers = lookup.get(6, TimeUnit.SECONDS);
+          } finally {
+            lookup.cancel(true);
+          }
+          var users = relatedUsers.getJSONArray("collection");
+          for (int i = 0; i < Math.min(3, users.length()); i++) {
+            long id = users
+              .getJSONObject(Math.floorMod(variation * 3 + i, users.length()))
+              .optLong("id");
+            if (id > 0 && id != user.optLong("id")) profileSearches.add(
+              radioIo.submit(() ->
+                radioPage(
+                  "/v1/soundcloud/api/users/soundcloud%3Ausers%3A" +
+                    id +
+                    "/tracks?limit=30&access=playable&linked_partitioning=true"
+                )
+              )
+            );
+          }
+        }
+      } catch (Exception ignored) {}
+      long profileDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
+      for (var search : profileSearches) {
+        try {
+          pages.add(
+            search.get(
+              Math.max(1, profileDeadline - System.nanoTime()),
+              TimeUnit.NANOSECONDS
+            )
+          );
+        } catch (Exception ignored) {
+          search.cancel(true);
+        }
+      }
+      long expanded = pages
+        .stream()
+        .flatMap(List::stream)
+        .filter(
+          row ->
+            row.playable() &&
+            !ownArtists.contains(row.artist()) &&
+            previous.stream().noneMatch(seen -> seen.id() == row.id())
+        )
+        .map(RadioMixer.Entry::artist)
+        .distinct()
+        .count();
+      String genre = anchor.optString("genre").trim();
+      if (expanded < 3 && !genre.isEmpty()) {
+        var search = radioIo.submit(() ->
+          radioPage(
+            "/v1/soundcloud/api/tracks?genres=" +
+              java.net.URLEncoder.encode(genre, "UTF-8") +
+              "&limit=50&access=playable&linked_partitioning=true"
+          )
+        );
+        try {
+          pages.add(search.get(6, TimeUnit.SECONDS));
+        } catch (Exception ignored) {
+          search.cancel(true);
+        }
+      }
+    }
+    if (pages.stream().allMatch(List::isEmpty)) throw new java.io.IOException(
+      "Related music unavailable"
+    );
+    var result = RadioMixer.mix(
+      seeds,
+      pages,
+      "artist".equals(context.optString("kind")),
+      previous
+    );
+    android.util.Log.i(
+      "VeiruneRadio",
+      "kind=" +
+        context.optString("kind") +
+        " seeds=" +
+        seeds.size() +
+        " related=" +
+        pages.stream().mapToInt(List::size).sum() +
+        " selected=" +
+        result.size()
+    );
+    return result;
+  }
+
+  private List<RadioMixer.Entry<JSONObject>> radioPage(String path)
+    throws Exception {
+    JSONArray rows = gateway.json(path, "GET", null).getJSONArray("collection");
+    var page = new ArrayList<RadioMixer.Entry<JSONObject>>();
+    for (int i = 0; i < rows.length(); i++) page.add(
+      radioEntry(rows.getJSONObject(i))
+    );
+    return page;
   }
 
   private void saveQueue() {
@@ -674,6 +1014,14 @@ public class PlaybackService extends MediaSessionService {
         .putInt("index", player.getCurrentMediaItemIndex())
         .putLong("position", player.getCurrentPosition())
         .putString("recommended", recommended.toString())
+        .putString(
+          "station",
+          player.getCurrentMediaItem() == null
+            ? ""
+            : player
+                .getCurrentMediaItem()
+                .mediaMetadata.extras.getString("station", "")
+        )
         .apply();
     } catch (Exception ignored) {}
   }
@@ -693,6 +1041,10 @@ public class PlaybackService extends MediaSessionService {
       var items = new ArrayList<MediaItem>();
       for (int i = 0; i < queue.length(); i++) {
         MediaItem value = FastcloudPlugin.item(queue.getJSONObject(i));
+        value.mediaMetadata.extras.putString(
+          "station",
+          prefs.getString("station", "")
+        );
         value.mediaMetadata.extras.putBoolean(
           "recommended",
           recommended.optBoolean(i, false)
@@ -715,6 +1067,8 @@ public class PlaybackService extends MediaSessionService {
 
   @Override
   public void onDestroy() {
+    destroyed = true;
+    radioIo.shutdownNow();
     handler.removeCallbacksAndMessages(null);
     saveQueue();
     cancelSpare();

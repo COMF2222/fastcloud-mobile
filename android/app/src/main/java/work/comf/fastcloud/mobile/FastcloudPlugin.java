@@ -30,6 +30,8 @@ import org.json.JSONObject;
 public class FastcloudPlugin extends Plugin {
 
   private final ExecutorService io = Executors.newFixedThreadPool(3);
+  private final ExecutorService network = Executors.newFixedThreadPool(4);
+  private final ExecutorService artworkIo = Executors.newFixedThreadPool(2);
   private MediaController controller;
   private com.google.common.util.concurrent.ListenableFuture<MediaController> controllerFuture;
   private Gateway gateway;
@@ -45,8 +47,15 @@ public class FastcloudPlugin extends Plugin {
   @PluginMethod
   public void appIcon(PluginCall call) {
     io.execute(() -> {
-      try { call.resolve(JSObject.fromJSONObject(AppIcons.apply(getContext(), call.getInt("id")))); }
-      catch (Exception error) { call.reject("Не удалось изменить значок приложения", error); }
+      try {
+        call.resolve(
+          JSObject.fromJSONObject(
+            AppIcons.apply(getContext(), call.getInt("id"))
+          )
+        );
+      } catch (Exception error) {
+        call.reject("Не удалось изменить значок приложения", error);
+      }
     });
   }
 
@@ -116,7 +125,15 @@ public class FastcloudPlugin extends Plugin {
   }
 
   private void background(PluginCall call, Task task) {
-    io.execute(() -> {
+    background(io, call, task);
+  }
+
+  private void background(
+    ExecutorService executor,
+    PluginCall call,
+    Task task
+  ) {
+    executor.execute(() -> {
       try {
         task.run();
       } catch (Exception e) {
@@ -137,31 +154,53 @@ public class FastcloudPlugin extends Plugin {
 
   @PluginMethod
   public void request(PluginCall call) {
-    background(call, () -> {
-      JSObject body = call.getObject("body");
-      Gateway.Response response = gateway.request(
-        call.getString("path", ""),
-        call.getString("method", "GET"),
-        body
-      );
-      JSObject result = new JSObject().put("status", response.status());
-      if (call.getBoolean("binary", false)) {
-        result.put(
-          "data",
-          Base64.encodeToString(response.bytes(), Base64.NO_WRAP)
-        );
-        result.put("contentType", response.type());
-      } else {
-        String data = new String(response.bytes(), StandardCharsets.UTF_8);
-        result.put(
-          "data",
-          data.isEmpty()
-            ? JSONObject.NULL
-            : new org.json.JSONTokener(data).nextValue()
-        );
+    background(
+      call.getBoolean("binary", false) ? artworkIo : network,
+      call,
+      () -> {
+        JSObject body = call.getObject("body");
+        String path = call.getString("path", "");
+        JSONObject account = gateway.session();
+        ArtworkCache cache =
+          account != null &&
+          "/v1/soundcloud/artwork".equals(path) &&
+          call.getBoolean("binary", false)
+            ? new ArtworkCache(
+                new java.io.File(
+                  getContext().getCacheDir(),
+                  "artwork-" + account.optLong("account_id")
+                )
+              )
+            : null;
+        String artwork = body == null ? "" : body.optString("url");
+        Gateway.Response response = cache == null ? null : cache.read(artwork);
+        if (response == null) {
+          response = gateway.request(
+            call.getString("path", ""),
+            call.getString("method", "GET"),
+            body
+          );
+          if (cache != null) cache.write(artwork, response);
+        }
+        JSObject result = new JSObject().put("status", response.status());
+        if (call.getBoolean("binary", false)) {
+          result.put(
+            "data",
+            Base64.encodeToString(response.bytes(), Base64.NO_WRAP)
+          );
+          result.put("contentType", response.type());
+        } else {
+          String data = new String(response.bytes(), StandardCharsets.UTF_8);
+          result.put(
+            "data",
+            data.isEmpty()
+              ? JSONObject.NULL
+              : new org.json.JSONTokener(data).nextValue()
+          );
+        }
+        call.resolve(result);
       }
-      call.resolve(result);
-    });
+    );
   }
 
   @PluginMethod
@@ -390,6 +429,11 @@ public class FastcloudPlugin extends Plugin {
             "recommended",
             call.getBoolean("recommended", false)
           );
+          var station = call.getObject("station");
+          if (station != null) value.mediaMetadata.extras.putString(
+            "station",
+            station.toString()
+          );
           items.add(value);
         }
         int index = call.getInt("index", 0);
@@ -406,13 +450,22 @@ public class FastcloudPlugin extends Plugin {
     });
   }
 
-  private static String playbackError(androidx.media3.common.PlaybackException error) {
+  private static String playbackError(
+    androidx.media3.common.PlaybackException error
+  ) {
     for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-      if (cause instanceof java.net.SocketTimeoutException) return "Server timed out while preparing audio";
-      if (cause instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException http) {
+      if (
+        cause instanceof java.net.SocketTimeoutException
+      ) return "Server timed out while preparing audio";
+      if (
+        cause instanceof
+          androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException http
+      ) {
         return "Audio request failed: HTTP " + http.responseCode;
       }
-      if (cause instanceof java.net.ConnectException) return "Could not connect to the audio server";
+      if (
+        cause instanceof java.net.ConnectException
+      ) return "Could not connect to the audio server";
     }
     return "Playback failed: " + error.getErrorCodeName();
   }
@@ -435,8 +488,27 @@ public class FastcloudPlugin extends Plugin {
         new JSObject()
           .put("queue", queue)
           .put("index", p.getCurrentMediaItemIndex())
-          .put("playing", p.getPlayWhenReady() && p.getPlayerError() == null && p.getPlaybackState() != Player.STATE_ENDED)
+          .put(
+            "playing",
+            p.getPlayWhenReady() &&
+              p.getPlayerError() == null &&
+              p.getPlaybackState() != Player.STATE_ENDED
+          )
           .put("loading", p.getPlaybackState() == Player.STATE_BUFFERING)
+          .put(
+            "radioLoading",
+            p.getCurrentMediaItem() != null &&
+              p
+                .getCurrentMediaItem()
+                .mediaMetadata.extras.getBoolean("radio_loading", false)
+          )
+          .put(
+            "radioError",
+            p.getCurrentMediaItem() != null &&
+              p
+                .getCurrentMediaItem()
+                .mediaMetadata.extras.getBoolean("radio_error", false)
+          )
           .put("positionMs", Math.max(0, p.getCurrentPosition()))
           .put("durationMs", duration < 0 ? 0 : duration)
           .put("shuffle", p.getShuffleModeEnabled())
@@ -477,7 +549,11 @@ public class FastcloudPlugin extends Plugin {
         int index = call.getInt("index", 0);
         switch (action) {
           case "toggle" -> {
-            if (p.getPlayerError() != null || p.getPlaybackState() == Player.STATE_IDLE || p.getPlaybackState() == Player.STATE_ENDED) {
+            if (
+              p.getPlayerError() != null ||
+              p.getPlaybackState() == Player.STATE_IDLE ||
+              p.getPlaybackState() == Player.STATE_ENDED
+            ) {
               if (p.getPlaybackState() == Player.STATE_ENDED) p.seekTo(0);
               p.prepare();
               p.play();
@@ -536,7 +612,8 @@ public class FastcloudPlugin extends Plugin {
         JSONObject account = gateway.session();
         if (
           account == null ||
-          account.optLong("account_id") != BridgeNumbers.id(call.getData().opt("accountId"))
+          account.optLong("account_id") !=
+            BridgeNumbers.id(call.getData().opt("accountId"))
         ) throw new Exception("Account changed; retry the request");
         if (call.getArray("history") != null) getContext()
           .getSharedPreferences("playback", 0)

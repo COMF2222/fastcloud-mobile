@@ -25,6 +25,7 @@ let account = 0,
   dirty: Dirty = {},
   syncing: { epoch: number; promise: Promise<void> } | null = null,
   saveChain = Promise.resolve();
+export const activeCloudAccount = () => account;
 export const useCloud = create<{ cloud: Cloud; status: string }>(() => ({
   cloud: emptyCloud(),
   status: "offline",
@@ -54,7 +55,10 @@ export async function activateCloud(id: number) {
       const value = JSON.parse(saved.value);
       device = value.device || device;
       dirty = value.dirty || {};
-      useCloud.setState({ cloud: { ...emptyCloud(), ...value.cloud } });
+      useCloud.setState({
+        cloud: { ...emptyCloud(), ...value.cloud },
+        status: "cached",
+      });
     } catch {
       /* Ignore a corrupt local cache; the server remains authoritative. */
     }

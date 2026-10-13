@@ -6,6 +6,7 @@ import {
   Heart,
   Play,
   Music2,
+  Users,
   Share2,
   Plus,
   ThumbsDown,
@@ -33,10 +34,16 @@ export function useResource<T>(
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
   const revision = useApp((s) => s.revision);
+  const identity = JSON.stringify(deps);
+  const previousIdentity = useRef(identity);
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError("");
+    if (previousIdentity.current !== identity) {
+      setValue(initial);
+      previousIdentity.current = identity;
+    }
     load()
       .then((v) => {
         if (alive) setValue(v);
@@ -65,19 +72,45 @@ export function RemoteImage({
   pixels?: number;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const placeholder = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
+    if (!placeholder.current || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(placeholder.current);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!visible) return;
     let alive = true;
     let highReady = false;
     setUrl(null);
-    if (src && pixels > 500) void artwork(artworkCandidates(src, 200)[0]).then(value => {
-      if (alive && !highReady) setUrl(value);
-    }).catch(() => {});
+    if (src && pixels > 500)
+      void artwork(artworkCandidates(src, 200)[0])
+        .then((value) => {
+          if (alive && !highReady) setUrl(value);
+        })
+        .catch(() => {});
     if (src)
       void (async () => {
         for (const candidate of artworkCandidates(src, pixels)) {
           if (!alive) return null;
-          try { return await artwork(candidate); }
-          catch { /* Try a supported smaller rendition if the original is absent. */ }
+          try {
+            return await artwork(candidate);
+          } catch {
+            /* Try a supported smaller rendition if the original is absent. */
+          }
         }
         return null;
       })()
@@ -89,11 +122,18 @@ export function RemoteImage({
     return () => {
       alive = false;
     };
-  }, [src, pixels]);
+  }, [src, pixels, visible]);
   return url ? (
-    <img className={className} src={url} alt={alt} loading={pixels > 500 ? "eager" : "lazy"} decoding="async" draggable={false} />
+    <img
+      className={className}
+      src={url}
+      alt={alt}
+      loading={pixels > 500 ? "eager" : "lazy"}
+      decoding="async"
+      draggable={false}
+    />
   ) : (
-    <span className={"image-placeholder " + className}>
+    <span ref={placeholder} className={"image-placeholder " + className}>
       <Music2 size={22} />
     </span>
   );
@@ -319,6 +359,28 @@ export function TrackMenu({
         </div>
       ) : (
         <div className="menu-list">
+          <button
+            onClick={() =>
+              action(async () => {
+                const { openTrack } = await import("./musicNavigation");
+                openTrack(track);
+              })
+            }
+          >
+            <Music2 />
+            {t("Открыть трек", "Open track")}
+          </button>
+          <button
+            onClick={() =>
+              action(async () => {
+                const { openTrackArtist } = await import("./musicNavigation");
+                await openTrackArtist(track);
+              })
+            }
+          >
+            <Users />
+            {t("Открыть артиста", "Open artist")}
+          </button>
           <button onClick={() => action(() => enqueue(track, true))}>
             <ListPlus />
             {t("Играть следующим", "Play next")}
@@ -334,13 +396,13 @@ export function TrackMenu({
           <button
             onClick={() =>
               action(async () => {
-                const related = await api.related(track.id);
-                await play([track, ...related], 0, true);
+                const { startStation } = await import("./player");
+                await startStation([track], "track");
               })
             }
           >
             <Radio />
-            {t("Станция по треку", "Track radio")}
+            {t("Волна по треку", "Track radio")}
           </button>
           <button onClick={() => action(() => share(track))}>
             <Share2 />
@@ -364,7 +426,7 @@ export function TrackMenu({
               ? t("Убрать дизлайк", "Remove dislike")
               : t("Не рекомендовать", "Do not recommend")}
           </button>
-          {track.user && (
+          {track.user && artist(track) !== track.user.username && (
             <button
               onClick={() => {
                 go("artist", track.user as never);
@@ -372,7 +434,7 @@ export function TrackMenu({
               }}
             >
               <Music2 />
-              {t("Профиль автора", "Artist profile")}
+              {t("Кто загрузил трек", "Uploader profile")}
             </button>
           )}
           {onRemove && (
@@ -392,6 +454,7 @@ export function TrackMenu({
   );
 }
 export function PlaylistCards({ lists }: { lists: Playlist[] }) {
+  const t = useText();
   return (
     <div className="playlist-grid">
       {lists.map((list) => (
@@ -407,8 +470,12 @@ export function PlaylistCards({ lists }: { lists: Playlist[] }) {
           />
           <strong>{list.title}</strong>
           <small>
-            {list.track_count || list.tracks?.length || 0} ·{" "}
-            {list.user?.username}
+            {list.track_count != null
+              ? `${list.track_count} ${t("треков", "tracks")}`
+              : list.tracks
+                ? `${list.tracks.length} ${t("треков", "tracks")}`
+                : t("Плейлист", "Playlist")}{" "}
+            · {list.user?.username}
           </small>
         </button>
       ))}

@@ -55,6 +55,20 @@ track writes at 500 rather than duplicating a playlist on retry.
 
 ## Players
 
+Track menus, the expanded player, collection details and artist profiles can
+start seed radio. Sixteen playable seeds sample the complete collection; the
+opening song plays before recommendations finish loading. Native playback keeps
+the original station context in the account-scoped queue and continues it with
+the screen locked, independently of ordinary playlist autoplay. Android fetches
+four related pages concurrently with a bounded wait and a twenty-second retry
+interval; selection preserves page rank while mixing sources, filtering dislikes,
+previews and already heard recordings. Artist radio aims for one source-artist
+song in three. Recent radio history is bounded to 1000 entries and the native
+played queue is trimmed while retaining fifteen previous songs. Late results
+cannot modify a replacement queue; pending candidates are checked against current
+dislikes again before appending. iOS implements the same source context but still
+requires a Mac build and device verification.
+
 Android uses a Media3 foreground MediaSessionService, network wake mode, audio
 focus, headset controls and a second prepared player for natural crossfade.
 iOS uses AVFoundation and the same native bridge contracts; Mac compilation and
@@ -84,3 +98,29 @@ corrupt files return to a retryable state. No silent installation exists.
 The persistent signing key lives outside the repo, with local password protected
 by Windows DPAPI. Only the owner configures GitHub signing secrets. iOS uses an
 App Store link once configured; there is no APK or arbitrary IPA fallback.
+
+## Music detail navigation
+
+The full player opens a song detail page from its title and the credited artist
+from its artist name. If the uploader differs from that credit, profile lookup
+uses an exact normalized performer name; an unmatched name opens music search
+instead of labeling the uploader as the performer. Track actions also expose
+these routes. Back retains a bounded account-local page/detail history; tab
+changes and sign-out clear it. Different detail IDs remount the detail view to
+prevent displaying the previous song while its replacement loads.
+
+## Bounded reads and artwork
+
+Account-scoped metadata reads coalesce concurrent requests and retain at most
+96 entries / 4 MiB for twenty seconds. Mutations invalidate this cache; changing
+accounts rejects late responses. Search shows its first fifty results without
+waiting for another page. Each library section appears independently, including
+wrapped playlist likes. Artwork loads near the viewport on a separate two-worker
+native pool and uses a private account cache bounded to 32 MiB / seven days.
+The player service retains independent network capacity.
+
+Radio refill queries keep the original source alongside up to two recent
+recommended songs. Sparse shelves expand through related profiles and then the
+source genre. A delayed result is accepted only by the same station session;
+skipping within that station does not discard a useful pending batch. Queue
+appends recheck live dislikes and IDs.

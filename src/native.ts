@@ -2,7 +2,9 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PlayerState, Track, Listen } from "./types";
 import type { MobileUpdate } from "./updates";
 export interface NativeBridge {
-  appIcon(options: { id?: number }): Promise<{ selected: number; supported: boolean; note?: string }>;
+  appIcon(options: {
+    id?: number;
+  }): Promise<{ selected: number; supported: boolean; note?: string }>;
   request(options: {
     path: string;
     method?: string;
@@ -30,6 +32,7 @@ export interface NativeBridge {
     tracks: Track[];
     index: number;
     recommended: boolean;
+    station?: import("./station").Station;
   }): Promise<void>;
   enqueue(options: { track: Track; next: boolean }): Promise<void>;
   control(options: {

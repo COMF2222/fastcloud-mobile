@@ -93,14 +93,14 @@ Workflow release.yml собирает APK тем же ключом, провер
 
 ```powershell
 cd D:\projects\fastcloud-mobile
-python tools/bump-version.py 0.1.4 --ru "Описание изменения" --en "Description of the change"
+python tools/bump-version.py 0.1.5 --ru "Описание изменения" --en "Description of the change"
 npm run apk
 python tools/stage-android-release.py
 git add .
-git commit -m "fix: mobile improvements; release 0.1.4"
+git commit -m "fix: mobile improvements; release 0.1.5"
 git push origin main
-git tag -a v0.1.4 -m "Veirune Mobile v0.1.4"
-git push origin v0.1.4
+git tag -a v0.1.5 -m "Veirune Mobile v0.1.5"
+git push origin v0.1.5
 ```
 
 `bump-version.py` обновляет package/lock, iOS версию/номер сборки и отдельные мобильные RU/EN заметки. Android берёт версию из package.json. Десктопный latest.json не используется мобильным клиентом.

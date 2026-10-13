@@ -40,6 +40,37 @@ export async function demoRequest(
   method: string,
   body: unknown,
 ): Promise<unknown> {
+  path = decodeURIComponent(path);
+  const route = path.split("?")[0].replace("/v1/soundcloud/api", "");
+  const userId = Number(route.match(/^\/users\/soundcloud:users:(\d+)$/)?.[1]);
+  if (userId)
+    return {
+      id: userId,
+      username:
+        ["Lil Peep", "CUPSIZE", "JESUS", "Luna"][userId - 1] || "Artist",
+    };
+  const tracksUser = Number(
+    route.match(/^\/users\/soundcloud:users:(\d+)\/tracks$/)?.[1],
+  );
+  if (tracksUser)
+    return {
+      collection: demoTracks.filter((track) => track.user?.id === tracksUser),
+    };
+  if (route.endsWith("/comments"))
+    return {
+      collection: [
+        {
+          id: 5001,
+          body: "Love this track",
+          user: { id: 2, username: "harlow2k" },
+        },
+      ],
+    };
+  const trackId = Number(
+    route.match(/^\/tracks\/soundcloud:tracks:(\d+)$/)?.[1],
+  );
+  if (trackId)
+    return demoTracks.find((track) => track.id === trackId) || demoTracks[0];
   if (path.includes("/playlists/") && path.includes("/tracks"))
     return { collection: demoTracks };
   if (path === "/v1/me/personal") {

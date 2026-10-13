@@ -1,7 +1,8 @@
-import { useAppIcon } from './AppIconPicker';
+import { useAppIcon } from "./AppIconPicker";
 import { useCallback, useEffect, useState } from "react";
-import { panelPalette } from "./themePalette";
+import { mobileTheme } from "./mobileTheme";
 import { PhonePairing } from "./PhonePairing";
+import { TrackPage } from "./TrackPage";
 import { ShareMusic } from "./ShareMusic";
 import { UpdateNotice, UpdateSheet } from "./UpdateUI";
 import { useUpdateChecks } from "./updates";
@@ -29,35 +30,52 @@ import { Messages, Statistics, Leaderboard } from "./SocialPages";
 import { Settings } from "./Settings";
 import { Imports } from "./Imports";
 import { MiniPlayer, FullPlayer, Queue, Offline } from "./PlaybackUI";
-import { useApp, boot, signIn, go, run, refreshLibrary } from "./state";
-import { useCloud, syncCloud } from "./cloud";
+import {
+  useApp,
+  boot,
+  signIn,
+  go,
+  back as goBack,
+  run,
+  refreshLibrary,
+} from "./state";
+import { useCloud, syncCloud, activeCloudAccount } from "./cloud";
 import { usePlayer, refreshPlayer } from "./player";
 import { native, nativePlatform, preview } from "./native";
 import { loadWallpaper, useWallpaper } from "./wallpaper";
 import { useText } from "./ui";
+import { invalidateRequests } from "./client";
 export default function App() {
   const appIcon = useAppIcon();
-  const [systemLight, setSystemLight] = useState(() => matchMedia('(prefers-color-scheme: light)').matches);
+  const [systemLight, setSystemLight] = useState(
+    () => matchMedia("(prefers-color-scheme: light)").matches,
+  );
   useEffect(() => {
-    const media = matchMedia('(prefers-color-scheme: light)');
+    const media = matchMedia("(prefers-color-scheme: light)");
     const changed = () => setSystemLight(media.matches);
-    media.addEventListener('change', changed);
-    return () => media.removeEventListener('change', changed);
+    media.addEventListener("change", changed);
+    return () => media.removeEventListener("change", changed);
   }, []);
   useUpdateChecks();
   const t = useText();
   const page = useApp((s) => s.page),
+    detailId = useApp((s) => s.detail?.id),
     me = useApp((s) => s.me),
     connecting = useApp((s) => s.connecting),
     toast = useApp((s) => s.toast);
   const prefs = useCloud((s) => s.cloud.preferences),
     expanded = usePlayer((s) => s.expanded),
-    currentTrack = usePlayer((s) => s.state.queue[s.state.index]);
+    hasCurrentTrack = usePlayer((s) => !!s.state.queue[s.state.index]);
   const cloud = useCloud((s) => s.cloud),
     syncStatus = useCloud((s) => s.status),
     likes = useApp((s) => s.likes);
   useEffect(() => {
-    if (nativePlatform && me)
+    if (
+      nativePlatform &&
+      me &&
+      activeCloudAccount() === me.id &&
+      syncStatus !== "loading"
+    )
       void native
         .playbackSettings({
           accountId: me.id,
@@ -67,13 +85,13 @@ export default function App() {
           likes: likes.map((t) => t.id),
         })
         .catch(() => {});
-  }, [cloud, likes, me]);
+  }, [cloud, likes, me, syncStatus]);
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--mini",
-      currentTrack ? "74px" : "0px",
+      hasCurrentTrack ? "74px" : "0px",
     );
-  }, [currentTrack]);
+  }, [hasCurrentTrack]);
   const wallpaper = useWallpaper();
   const shareRequest = useApp((s) => s.shareRequest);
   const [backgroundOnly, setBackgroundOnly] = useState(false);
@@ -115,7 +133,7 @@ export default function App() {
           }
           if (usePlayer.getState().expanded)
             usePlayer.setState({ expanded: false });
-          else if (useApp.getState().page !== "home") go("home");
+          else if (useApp.getState().page !== "home") goBack();
           else void NativeApp.minimizeApp();
         })
       : null;
@@ -131,44 +149,13 @@ export default function App() {
     root.lang = prefs.language === "English" ? "en" : "ru";
     root.style.fontSize = `${16 * Number(prefs.interface_text_scale || 1)}px`;
     root.dataset.theme =
-      prefs.theme === "Light" ||
-      (prefs.theme === "System" &&
-        systemLight)
+      prefs.theme === "Light" || (prefs.theme === "System" && systemLight)
         ? "light"
         : "dark";
     root.dataset.motion = prefs.reduced_motion ? "reduced" : "full";
-    const rgb =
-      (prefs.accent_rgb as number[]) ||
-      (root.dataset.theme === "light" ? [37, 42, 75] : [255, 255, 255]);
-    root.style.setProperty("--accent", `rgb(${rgb.join(",")})`);
-    const bright = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-    root.style.setProperty("--on-accent", bright > 150 ? "#101116" : "#ffffff");
-    root.style.setProperty(
-      "--panel-opacity",
-      String(prefs.panel_opacity ?? 0.85),
-    );
-    if (prefs.panel_rgb)
-      root.style.setProperty(
-        "--surface-rgb",
-        panelPalette(
-          prefs.panel_rgb as number[],
-          Number(prefs.panel_opacity ?? 0.85),
-          root.dataset.theme === "light",
-        ).surface.join(","),
-      );
-    else root.style.removeProperty("--surface-rgb");
-    if (prefs.text_rgb)
-      root.style.setProperty(
-        "--text",
-        `rgb(${(prefs.text_rgb as number[]).join(",")})`,
-      );
-    else root.style.removeProperty("--text");
-    if (prefs.muted_text_rgb)
-      root.style.setProperty(
-        "--muted",
-        `rgb(${(prefs.muted_text_rgb as number[]).join(",")})`,
-      );
-    else root.style.removeProperty("--muted");
+    const theme = mobileTheme(prefs, root.dataset.theme === "light");
+    for (const [key, value] of Object.entries(theme.vars))
+      root.style.setProperty(key, value);
   }, [prefs, systemLight]);
   const nav = [
     ["home", HomeIcon, "Главная", "Home"],
@@ -191,6 +178,7 @@ export default function App() {
             <img src={wallpaper.url} alt="" />
           )}
           <div
+            className="wallpaper-shade"
             style={{
               background: `rgba(0,0,0,${Number(prefs.background_dim) || 0})`,
             }}
@@ -261,7 +249,7 @@ export default function App() {
               <button
                 className="icon-button"
                 aria-label={t("Назад", "Back")}
-                onClick={() => go("profile")}
+                onClick={goBack}
               >
                 <ArrowLeft />
               </button>
@@ -283,6 +271,7 @@ export default function App() {
               onClick={() =>
                 void run(async () => {
                   await syncCloud();
+                  invalidateRequests();
                   await refreshLibrary();
                 })
               }
@@ -292,10 +281,13 @@ export default function App() {
           </header>
           {syncStatus === "offline" && (
             <div className="connection-banner" role="status">
-              {t("Не удалось синхронизировать настройки", "Settings could not be synced")}
+              {t(
+                "Не удалось синхронизировать настройки",
+                "Settings could not be synced",
+              )}
             </div>
           )}
-          <main key={page}>
+          <main key={`${page}:${detailId || 0}`}>
             <UpdateNotice />
             {page === "home" ? (
               <Home />
@@ -317,6 +309,8 @@ export default function App() {
               <PlaylistPage />
             ) : page === "artist" ? (
               <ArtistPage />
+            ) : page === "track" ? (
+              <TrackPage />
             ) : page === "following" ? (
               <Following />
             ) : page === "dislikes" ? (
@@ -335,7 +329,7 @@ export default function App() {
               <button
                 key={target}
                 aria-current={page === target ? "page" : undefined}
-                onClick={() => go(target)}
+                onClick={() => go(target, null, true)}
               >
                 <Icon size={22} />
                 <span>{t(ru, en)}</span>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SmartEditor } from "./SmartEditor";
+import { StationButton } from "./StationButton";
 import {
   Play,
   Search,
@@ -16,6 +17,7 @@ import {
   Trophy,
   LogOut,
   Music2,
+  Minus,
 } from "lucide-react";
 import { api, request } from "./client";
 import { useApp, go, run, signOut, refreshLibrary } from "./state";
@@ -134,7 +136,21 @@ export function Home() {
       )}
       {lists.length > 0 && (
         <section>
-          <h2>{t("Твои подборки", "Your playlists")}</h2>
+          <div className="section-heading">
+            <h2>
+              {t("Твои подборки", "Your playlists")}{" "}
+              <small>{lists.length}</small>
+            </h2>
+            <button
+              className="text-button"
+              onClick={() => {
+                useApp.setState({ libraryTab: "playlists" });
+                go("library");
+              }}
+            >
+              {t("Все", "All")} <ArrowRight size={16} />
+            </button>
+          </div>
           <PlaylistCards lists={lists.slice(0, 4)} />
         </section>
       )}
@@ -198,8 +214,8 @@ export function Home() {
 
 export function SearchPage() {
   const t = useText();
-  const [text, setText] = useState(""),
-    [query, setQuery] = useState(""),
+  const [text, setText] = useState(useApp.getState().searchQuery),
+    [query, setQuery] = useState(useApp.getState().searchQuery),
     [kind, setKind] = useState("tracks");
   const result = useResource(
     async () => {
@@ -229,6 +245,7 @@ export function SearchPage() {
         onSubmit={(e) => {
           e.preventDefault();
           setQuery(text.trim());
+          useApp.setState({ searchQuery: text.trim() });
         }}
       >
         <Search size={20} />
@@ -314,7 +331,7 @@ export function SearchPage() {
 
 export function Library() {
   const t = useText();
-  const [tab, setTab] = useState("likes"),
+  const [tab, setTab] = useState(useApp.getState().libraryTab),
     [filter, setFilter] = useState(""),
     [create, setCreate] = useState(false),
     [folder, setFolder] = useState<string | null>(null);
@@ -361,6 +378,7 @@ export function Library() {
             aria-pressed={tab === row[0]}
             onClick={() => {
               setTab(row[0]);
+              useApp.setState({ libraryTab: row[0] });
               setFolder(null);
             }}
           >
@@ -580,6 +598,7 @@ export function PlaylistPage() {
             <Play size={18} fill="currentColor" />
             {t("Слушать", "Play")}
           </button>
+          <StationButton kind="collection" tracks={tracks} />
           <button
             className="icon-button"
             aria-label={t("Перемешать", "Shuffle")}
@@ -769,21 +788,26 @@ export function ArtistPage() {
         />
         <h1>{profile.value?.username}</h1>
         <p>{profile.value?.description}</p>
-        <button
-          className="primary"
-          disabled={followBusy || following.loading}
-          aria-pressed={followed}
-          onClick={() => {
-            setFollowBusy(true);
-            void run(async () => {
-              await api.follow(user.id, !followed);
-              useApp.setState((state) => ({ revision: state.revision + 1 }));
-            }).finally(() => setFollowBusy(false));
-          }}
-        >
-          <Plus size={18} />
-          {followed ? t("Отписаться", "Unfollow") : t("Подписаться", "Follow")}
-        </button>
+        <div className="collection-actions">
+          <StationButton kind="artist" tracks={data.value || []} />
+          <button
+            className="primary"
+            disabled={followBusy || following.loading}
+            aria-pressed={followed}
+            onClick={() => {
+              setFollowBusy(true);
+              void run(async () => {
+                await api.follow(user.id, !followed);
+                useApp.setState((state) => ({ revision: state.revision + 1 }));
+              }).finally(() => setFollowBusy(false));
+            }}
+          >
+            {followed ? <Minus size={18} /> : <Plus size={18} />}
+            {followed
+              ? t("Отписаться", "Unfollow")
+              : t("Подписаться", "Follow")}
+          </button>
+        </div>
       </div>
       <Status error={data.error} loading={data.loading} />
       <TrackList tracks={data.value || []} />
@@ -806,7 +830,11 @@ export function Profile() {
   return (
     <>
       <div className="profile-hero">
-        <RemoteImage src={me?.avatar_url} className="profile-cover" pixels={500} />
+        <RemoteImage
+          src={me?.avatar_url}
+          className="profile-cover"
+          pixels={500}
+        />
         <p className="eyebrow">YOUR VEIRUNE</p>
         <h1>{me?.username}</h1>
       </div>

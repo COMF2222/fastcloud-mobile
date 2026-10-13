@@ -5,6 +5,12 @@ import { shuffled } from "./contracts";
 import { blocked, useCloud } from "./cloud";
 import { artist, type PlayerState, type Track } from "./types";
 import { searchRecommendations } from "./searchRecommendations";
+import {
+  stationSeeds,
+  stationOpening,
+  type Station,
+  type StationKind,
+} from "./station";
 const initial: PlayerState = {
   queue: [],
   index: 0,
@@ -29,7 +35,12 @@ export async function refreshPlayer() {
     pending = false;
   }
 }
-export async function play(tracks: Track[], index = 0, recommended = false) {
+export async function play(
+  tracks: Track[],
+  index = 0,
+  recommended = false,
+  station?: Station,
+) {
   const selected = tracks[index];
   const allowed = recommended ? tracks.filter((t) => !blocked(t)) : tracks;
   if (!allowed.length) throw Error("Нет подходящих треков");
@@ -49,8 +60,21 @@ export async function play(tracks: Track[], index = 0, recommended = false) {
     });
     return;
   }
-  await native.play({ tracks: allowed, index, recommended });
+  await native.play({ tracks: allowed, index, recommended, station });
   await refreshPlayer();
+}
+export async function startStation(tracks: Track[], kind: StationKind) {
+  const seeds = stationSeeds(
+    tracks.filter((track) => !blocked(track)),
+    kind === "track" ? 0 : Math.random(),
+  );
+  if (!seeds.length)
+    throw Error("Нет доступных треков для волны / No playable radio seeds");
+  await play(stationOpening(seeds, kind), 0, true, {
+    kind,
+    seeds,
+    session: crypto.randomUUID(),
+  });
 }
 export async function control(
   action: string,
@@ -62,7 +86,8 @@ export async function control(
     const s = { ...usePlayer.getState().state };
     if (action === "toggle") s.playing = !s.playing;
     if (action === "next") s.index = Math.min(s.index + 1, s.queue.length - 1);
-    if (action === "previous" || action === "previous_track") s.index = Math.max(0, s.index - 1);
+    if (action === "previous" || action === "previous_track")
+      s.index = Math.max(0, s.index - 1);
     if (action === "jump") s.index = index || 0;
     if (action === "seek") s.positionMs = value || 0;
     if (action === "shuffle") s.shuffle = !s.shuffle;

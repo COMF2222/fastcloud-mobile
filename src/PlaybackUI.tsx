@@ -1,5 +1,7 @@
 import { lockPageScroll } from "./modalScroll";
 import { usePlayerSwipe } from "./usePlayerSwipe";
+import { StationButton } from "./StationButton";
+import { openTrack, openTrackArtist } from "./musicNavigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Play,
@@ -38,7 +40,13 @@ export function MiniPlayer() {
   const state = usePlayer((s) => s.state),
     expanded = usePlayer((s) => s.expanded);
   const track = state.queue[state.index];
-  const swipe = usePlayerSwipe(track?.id, action => void run(() => control(action === "previous" ? "previous_track" : action)));
+  const swipe = usePlayerSwipe(
+    track?.id,
+    (action) =>
+      void run(() =>
+        control(action === "previous" ? "previous_track" : action),
+      ),
+  );
   if (!track || expanded) return null;
   return (
     <div className="mini-player">
@@ -74,7 +82,11 @@ export function MiniPlayer() {
           <Play fill="currentColor" size={22} />
         )}
       </button>
-      <button className="icon-button" aria-label={t("Следующий", "Next")} onClick={() => void run(() => control("next"))}>
+      <button
+        className="icon-button"
+        aria-label={t("Следующий", "Next")}
+        onClick={() => void run(() => control("next"))}
+      >
         <SkipForward size={20} fill="currentColor" />
       </button>
       <div
@@ -90,14 +102,23 @@ export function FullPlayer() {
   const t = useText();
   const state = usePlayer((s) => s.state);
   const track = state.queue[state.index];
-  const swipe = usePlayerSwipe(track?.id, action => void run(() => control(action === "previous" ? "previous_track" : action)));
+  const swipe = usePlayerSwipe(
+    track?.id,
+    (action) =>
+      void run(() =>
+        control(action === "previous" ? "previous_track" : action),
+      ),
+  );
   const [tab, setTab] = useState("cover"),
     [settings, setSettings] = useState(false),
     [sleep, setSleep] = useState(false);
   const liked = useApp((s) => s.likes.some((v) => v.id === track?.id));
   const [seek, setSeek] = useState<number | null>(null);
   useEffect(() => {
-    if (!track) { usePlayer.setState({ expanded: false }); return; }
+    if (!track) {
+      usePlayer.setState({ expanded: false });
+      return;
+    }
     const before = document.activeElement as HTMLElement | null;
     const unlockScroll = lockPageScroll();
     document
@@ -112,13 +133,28 @@ export function FullPlayer() {
         usePlayer.setState({ expanded: false });
       }
       if (event.key === "Tab") {
-        const items = [...dialog.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]')].filter(node => node.getClientRects().length > 0);
-        const first = items[0], last = items[items.length - 1];
+        const items = [
+          ...dialog.querySelectorAll<HTMLElement>(
+            'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]',
+          ),
+        ].filter((node) => node.getClientRects().length > 0);
+        const first = items[0],
+          last = items[items.length - 1];
         if (!first || !last) return;
-        if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
-          event.preventDefault(); last.focus();
-        } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
-          event.preventDefault(); first.focus();
+        if (
+          event.shiftKey &&
+          (document.activeElement === first ||
+            !dialog.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          last.focus();
+        } else if (
+          !event.shiftKey &&
+          (document.activeElement === last ||
+            !dialog.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          first.focus();
         }
       }
     };
@@ -185,8 +221,22 @@ export function FullPlayer() {
       <div className="player-bottom">
         <div className="now-title">
           <span>
-            <h2>{track.title}</h2>
-            <p>{artist(track)}</p>
+            <h2>
+              <button
+                className="music-text-link"
+                onClick={() => openTrack(track)}
+              >
+                {track.title}
+              </button>
+            </h2>
+            <p>
+              <button
+                className="music-text-link"
+                onClick={() => void run(() => openTrackArtist(track))}
+              >
+                {artist(track)}
+              </button>
+            </p>
           </span>
           <button
             className={"icon-button " + (liked ? "liked" : "")}
@@ -265,6 +315,7 @@ export function FullPlayer() {
           </button>
         </div>
         <div className="player-tools">
+          <StationButton kind="track" tracks={[track]} iconOnly />
           <button
             className="icon-button"
             aria-label={t("Таймер сна", "Sleep timer")}
@@ -290,6 +341,19 @@ export function FullPlayer() {
             <ListMusic />
           </button>
         </div>
+        {state.radioLoading && (
+          <p className="muted" role="status">
+            {t("Подбираем похожие треки…", "Finding similar tracks…")}
+          </p>
+        )}
+        {state.radioError && (
+          <p className="player-error" role="status">
+            {t(
+              "Не удалось подобрать похожие треки. Запусти волну ещё раз.",
+              "Could not find similar tracks. Start radio again.",
+            )}
+          </p>
+        )}
         {state.error && (
           <p className="player-error">
             {t(
@@ -375,7 +439,7 @@ export function FullPlayer() {
     </div>
   );
 }
-function Lyrics({ track }: { track: Track }) {
+export function Lyrics({ track }: { track: Track }) {
   const t = useText();
   const position = usePlayer((s) => s.state.positionMs),
     duration = usePlayer((s) => s.state.durationMs);
@@ -443,7 +507,7 @@ function Lyrics({ track }: { track: Track }) {
     </div>
   );
 }
-function Comments({ track }: { track: Track }) {
+export function Comments({ track }: { track: Track }) {
   const t = useText();
   const result = useResource(() => api.comments(track.id), [track.id]);
   const [text, setText] = useState("");
@@ -486,6 +550,19 @@ export function Queue() {
   return (
     <>
       <h1>{t("Очередь", "Queue")}</h1>
+      {state.radioLoading && (
+        <p role="status">
+          {t("Подбираем похожие треки…", "Finding similar tracks…")}
+        </p>
+      )}
+      {state.radioError && (
+        <p className="error-card" role="status">
+          {t(
+            "Не удалось подобрать похожие треки. Запусти волну ещё раз.",
+            "Could not find similar tracks. Start radio again.",
+          )}
+        </p>
+      )}
       <TrackList
         tracks={state.queue}
         onPlay={(index) => void run(() => control("jump", undefined, index))}

@@ -115,6 +115,8 @@ export const emptyCloud = (): Cloud => ({
   totals: { ms: 0, plays: 0 },
 });
 export type PlayerState = {
+  radioLoading?: boolean;
+  radioError?: boolean;
   queue: Track[];
   index: number;
   playing: boolean;

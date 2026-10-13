@@ -472,7 +472,7 @@ main > h2 {
   align-items: center;
   height: calc(var(--nav) + env(safe-area-inset-bottom, 0px));
   padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg);
+  background: var(--chrome, var(--bg));
   border-top: 1px solid rgba(128, 132, 150, 0.22);
   z-index: 20;
 }
@@ -502,7 +502,7 @@ main > h2 {
   transform: translateX(-50%);
   width: calc(100% - 16px);
   max-width: 744px;
-  background: var(--solid);
+  background: var(--chrome, var(--solid));
   border: 1px solid rgba(128, 132, 150, 0.25);
   border-radius: 12px;
   min-height: 64px;
@@ -526,11 +526,20 @@ main > h2 {
 }
 .swipe-surface {
   transform: translate3d(var(--track-swipe-x, 0px), 0, 0);
-  transition: transform 220ms cubic-bezier(.2,.75,.25,1), opacity 180ms ease;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    opacity 180ms ease;
 }
-.swipe-surface.swipe-dragging { transition: none; }
-.swipe-surface[data-swipe-phase="out"] { opacity: .45; }
-.swipe-surface[data-swipe-phase="in"] { opacity: .65; transition: none; }
+.swipe-surface.swipe-dragging {
+  transition: none;
+}
+.swipe-surface[data-swipe-phase="out"] {
+  opacity: 0.45;
+}
+.swipe-surface[data-swipe-phase="in"] {
+  opacity: 0.65;
+  transition: none;
+}
 .mini-main .artwork {
   width: 42px;
   height: 42px;
@@ -661,6 +670,52 @@ main > h2 {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.music-text-link {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  min-height: 44px;
+  max-width: 100%;
+  color: inherit;
+  text-align: inherit;
+  font: inherit;
+  display: inline-block;
+  overflow-wrap: anywhere;
+}
+.music-text-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.track-detail-hero .collection-actions {
+  margin-top: 12px;
+}
+.now-title .music-text-link {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.collection-actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(var(--surface-rgb), var(--panel-opacity));
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.station-loading {
+  animation: spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .station-loading {
+    animation: none;
+  }
 }
 .profile-cover {
   width: 100px;
@@ -1500,6 +1555,7 @@ progress {
     padding-right: 16px;
   }
   .wave-card {
+    --muted: #c3c7e2;
     padding: 20px;
   }
   .wave-actions .primary {
@@ -1516,6 +1572,9 @@ progress {
   .player-controls {
     gap: 8px;
   }
+}
+:root[data-theme="light"] .wallpaper-shade {
+  background: rgba(245, 245, 249, 0.78) !important;
 }
 @media (min-width: 600px) {
   .playlist-grid {
@@ -1626,4 +1685,8 @@ progress {
   accent-color: var(--accent);
 }
 
-.bottom-nav button span { max-width: 100%; line-height: 1.2; overflow-wrap: anywhere; }
+.bottom-nav button span {
+  max-width: 100%;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}

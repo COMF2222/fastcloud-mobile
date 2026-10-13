@@ -2,6 +2,29 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.4",
+      "ru": {
+        "title": "Veirune Mobile 0.1.4",
+        "changes": [
+          "Волна по треку, альбому, плейлисту и артисту.",
+          "Музыка выбранного артиста чередуется с похожими исполнителями; подбор продолжается с погашенным экраном и учитывает дизлайки.",
+          "Из большого плеера можно открыть карточку песни и профиль артиста; кнопка назад возвращает на предыдущий экран.",
+          "Ускорена повторная загрузка музыки и обложек; на главной можно перейти ко всем своим плейлистам.",
+          "Исправлены светлая тема, кнопка отписки и отображение результатов поиска плейлистов."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.4",
+        "changes": [
+          "Start radio from a track, album, playlist or artist.",
+          "Artist radio mixes their songs with similar performers, continues with the screen locked and respects dislikes.",
+          "Open song details and artist profiles from the full player, with Back returning to the previous screen.",
+          "Faster repeat loading of music and artwork; open all your playlists from Home.",
+          "Fixed light theme readability, the Unfollow button and playlist search results."
+        ]
+      }
+    },
+    {
       "version": "0.1.3",
       "ru": {
         "title": "Veirune Mobile 0.1.3",

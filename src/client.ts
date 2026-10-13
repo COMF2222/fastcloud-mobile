@@ -9,6 +9,17 @@ import {
 } from "./types";
 import { demoRequest } from "./demo";
 import { collect } from "./pagination";
+import { collectionItems } from "./collectionItems";
+import { RequestCache } from "./requestCache";
+const requests = new RequestCache();
+let requestAccount = 0;
+export function setRequestAccount(id: number) {
+  if (requestAccount !== id) {
+    requestAccount = id;
+    requests.clear();
+  }
+}
+export const invalidateRequests = () => requests.invalidate();
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -20,6 +31,21 @@ export class ApiError extends Error {
 export async function request<T>(
   path: string,
   method = "GET",
+  body?: unknown,
+): Promise<T> {
+  if (method !== "GET") {
+    const result = await loadRequest<T>(path, method, body);
+    requests.invalidate();
+    return result;
+  }
+  const ttl = path.startsWith("/v1/soundcloud/api/") ? 20000 : 0;
+  return requests.read(`${requestAccount}:${path}`, ttl, () =>
+    loadRequest<T>(path, method, body),
+  );
+}
+async function loadRequest<T>(
+  path: string,
+  method: string,
   body?: unknown,
 ): Promise<T> {
   if (!path.startsWith("/v1/") || path.includes("..") || path.includes("://"))
@@ -50,7 +76,16 @@ export async function collection<T>(
   path: string,
   maximum = 5000,
 ): Promise<T[]> {
-  return collect<T>(path, (next) => sc(next), maximum);
+  const rows = await collect<T>(path, (next) => sc(next), maximum);
+  const route = path.split("?")[0];
+  const kind = /\/comments$/.test(route)
+    ? "comments"
+    : /(?:^|\/)tracks$|^\/tracks|^\/tracks\/[^/]+\/related$/.test(route)
+      ? "tracks"
+      : /(?:^|\/)playlists$|^\/playlists/.test(route)
+        ? "playlists"
+        : "users";
+  return collectionItems(rows, kind) as T[];
 }
 export const api = {
   me: () => sc<User>("/me"),
@@ -97,7 +132,7 @@ export const api = {
   search: (query: string, kind = "tracks") =>
     collection<Track | Playlist | User>(
       `/${kind}?q=${encodeURIComponent(query)}&limit=50${kind === "tracks" ? "&access=playable,preview" : ""}`,
-      100,
+      50,
     ),
   like: (id: number, active: boolean) =>
     sc(`/likes/tracks/${urn("tracks", id)}`, active ? "POST" : "DELETE"),
@@ -166,8 +201,11 @@ export async function artwork(raw: string): Promise<string> {
   if (pending) return pending;
   const load = loadArtwork(raw);
   imageFlights.set(raw, load);
-  try { return await load; }
-  finally { imageFlights.delete(raw); }
+  try {
+    return await load;
+  } finally {
+    imageFlights.delete(raw);
+  }
 }
 async function loadArtwork(raw: string): Promise<string> {
   const response = await native.request({
@@ -178,12 +216,19 @@ async function loadArtwork(raw: string): Promise<string> {
   });
   if (response.status !== 200) throw Error("Artwork unavailable");
   const result = `data:${response.contentType || "image/jpeg"};base64,${response.data}`;
-  while (imageCache.size && (imageCache.size >= 128 || imageBytes + result.length * 2 > 16 * 1024 * 1024)) {
+  while (
+    imageCache.size &&
+    (imageCache.size >= 128 ||
+      imageBytes + result.length * 2 > 16 * 1024 * 1024)
+  ) {
     const key = imageCache.keys().next().value!;
     imageBytes -= imageCache.get(key)!.length * 2;
     imageCache.delete(key);
   }
-  if (result.length * 2 <= 16 * 1024 * 1024) { imageCache.set(raw, result); imageBytes += result.length * 2; }
+  if (result.length * 2 <= 16 * 1024 * 1024) {
+    imageCache.set(raw, result);
+    imageBytes += result.length * 2;
+  }
   return result;
 }
 export const publicUrl = (path: string) => new URL(path, server).href;

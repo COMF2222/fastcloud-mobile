@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { Preferences as Storage } from "@capacitor/preferences";
 import { native, nativePlatform, preview, server } from "./native";
-import { api } from "./client";
+import { api, setRequestAccount } from "./client";
 import { activateCloud, resetCloud, syncCloud } from "./cloud";
 import type { Track, Playlist, User } from "./types";
+import { pushPage, popPage, type NavigationEntry } from "./navigation";
 export type Page =
   | "home"
   | "search"
@@ -18,11 +19,15 @@ export type Page =
   | "following"
   | "playlist"
   | "artist"
+  | "track"
   | "queue"
   | "imports";
 export const useApp = create<{
   page: Page;
   detail: Track | Playlist | User | null;
+  navigation: NavigationEntry<Page, Track | Playlist | User | null>[];
+  searchQuery: string;
+  libraryTab: string;
   me: User | null;
   connecting: boolean;
   likes: Track[];
@@ -34,6 +39,9 @@ export const useApp = create<{
 }>(() => ({
   page: "home",
   detail: null,
+  navigation: [],
+  searchQuery: "",
+  libraryTab: "likes",
   me: null,
   connecting: true,
   likes: [],
@@ -56,44 +64,80 @@ export async function run(task: () => Promise<unknown>) {
     notify(cause instanceof Error ? cause.message : String(cause));
   }
 }
-export const go = (page: Page, detail: Track | Playlist | User | null = null) =>
-  useApp.setState({ page, detail });
-export async function refreshLibrary() {
+export const go = (
+  page: Page,
+  detail: Track | Playlist | User | null = null,
+  reset = false,
+) =>
+  useApp.setState((state) => ({
+    page,
+    detail,
+    navigation: pushPage(
+      state.navigation,
+      { page: state.page, detail: state.detail },
+      { page, detail },
+      reset,
+    ),
+  }));
+export const back = () =>
+  useApp.setState((state) => {
+    const previous = popPage(state.navigation, {
+      page: "home" as Page,
+      detail: null,
+    });
+    return { ...previous.entry, navigation: previous.history };
+  });
+let libraryFlight: { owner: number; promise: Promise<void> } | null = null;
+export function refreshLibrary(): Promise<void> {
   const state = useApp.getState();
-  if (!state.me) return;
+  if (!state.me) return Promise.resolve();
   const id = state.me.id;
+  if (libraryFlight?.owner === id) return libraryFlight.promise;
+  const promise = loadLibrary(id).finally(() => {
+    if (libraryFlight?.promise === promise) libraryFlight = null;
+  });
+  libraryFlight = { owner: id, promise };
+  return promise;
+}
+async function loadLibrary(id: number) {
+  const before = useApp.getState();
+  let own = before.playlists.filter((list) => list.user?.id === id);
+  let saved = before.playlists.filter((list) => list.user?.id !== id);
+  const apply = (patch: Partial<ReturnType<typeof useApp.getState>>) => {
+    if (useApp.getState().me?.id === id) useApp.setState(patch);
+  };
+  const mergeLists = () =>
+    apply({
+      playlists: [
+        ...new Map([...own, ...saved].map((list) => [list.id, list])).values(),
+      ],
+    });
   const results = await Promise.allSettled([
-    api.likes(),
-    api.history(),
-    api.playlists(),
-    api.likedPlaylists(),
+    api.likes().then((likes) => apply({ likes })),
+    api.history().then((recent) => apply({ recent })),
+    api.playlists().then((lists) => {
+      own = lists;
+      mergeLists();
+    }),
+    api.likedPlaylists().then((lists) => {
+      saved = lists;
+      mergeLists();
+    }),
   ]);
   if (useApp.getState().me?.id !== id) return;
-  const [likes, recent, own, saved] = results;
-  const patch: Partial<ReturnType<typeof useApp.getState>> = {
-    revision: state.revision + 1,
-  };
-  if (likes.status === "fulfilled") patch.likes = likes.value;
-  if (recent.status === "fulfilled") patch.recent = recent.value;
-  if (own.status === "fulfilled" || saved.status === "fulfilled")
-    patch.playlists = [
-      ...new Map(
-        [
-          ...(own.status === "fulfilled" ? own.value : []),
-          ...(saved.status === "fulfilled" ? saved.value : []),
-        ].map((v) => [v.id, v]),
-      ).values(),
-    ];
-  useApp.setState(patch);
+  if (results.every((result) => result.status === "rejected"))
+    notify("Не удалось обновить музыку / Could not refresh music");
+  const current = useApp.getState();
   await Storage.set({
     key: `library-${id}`,
     value: JSON.stringify({
-      likes: patch.likes || state.likes,
-      recent: patch.recent || state.recent,
-      playlists: patch.playlists || state.playlists,
+      likes: current.likes,
+      recent: current.recent,
+      playlists: current.playlists,
     }),
   });
 }
+
 let booting: Promise<void> | null = null;
 export function boot(): Promise<void> {
   if (booting) return booting;
@@ -112,19 +156,31 @@ async function bootAccount() {
         ? await native.session()
         : { signedIn: false };
     if (!session.signedIn) return;
-    let me: User | null = null;
+    setRequestAccount(session.accountId || 0);
+    let me: User = { id: session.accountId!, username: "Veirune" };
     const saved = await Storage.get({ key: `profile-${session.accountId}` });
     if (saved.value)
       try {
-        me = JSON.parse(saved.value);
+        const cached = JSON.parse(saved.value);
+        if (cached.id === session.accountId) me = cached;
       } catch {}
-    try {
-      me = await api.me();
-      await Storage.set({ key: `profile-${me.id}`, value: JSON.stringify(me) });
-    } catch {
-      if (!me) me = { id: session.accountId!, username: "Veirune" };
-    }
     useApp.setState({ me });
+    void api
+      .me()
+      .then(async (profile) => {
+        if (
+          useApp.getState().me?.id !== session.accountId ||
+          profile.id !== session.accountId
+        )
+          return;
+        useApp.setState({ me: profile });
+        await Storage.set({
+          key: `profile-${profile.id}`,
+          value: JSON.stringify(profile),
+        });
+      })
+      .catch(() => {});
+    void api.chat("activate", "POST", {}).catch(() => {});
     const library = await Storage.get({ key: `library-${me.id}` });
     if (library.value)
       try {
@@ -137,7 +193,6 @@ async function bootAccount() {
       } catch {}
     await activateCloud(me.id);
     await refreshLibrary();
-    void api.chat("activate", "POST", {}).catch(() => {});
   } catch (cause) {
     notify(String(cause));
   } finally {
@@ -157,6 +212,7 @@ export async function signIn() {
 export async function signOut() {
   await syncCloud();
   await native.logout();
+  setRequestAccount(0);
   resetCloud();
   useApp.setState({
     me: null,
@@ -164,6 +220,10 @@ export async function signOut() {
     playlists: [],
     recent: [],
     page: "home",
+    detail: null,
+    navigation: [],
+    searchQuery: "",
+    libraryTab: "likes",
     shareRequest: null,
   });
 }

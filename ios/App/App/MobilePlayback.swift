@@ -31,6 +31,8 @@ import UIKit
     private var speed: Float = 1
     private var shuffle = false
     private var repeatMode = 0
+    private var stationVariation = 0
+    private var extending = false
     private var preferences: [String: Any] { MobileLocal.dictionary("playback-preferences") }
     private var feedback: [String: [String: Any]] { MobileLocal.dictionary("playback-feedback") as? [String: [String: Any]] ?? [:] }
     private init() {
@@ -98,19 +100,52 @@ import UIKit
         saveQueue(); updateNowPlaying()
     }
     private func extend() async {
-        guard preferences["autoplay"] as? Bool != false, queue.count - index < 5, let track = queue.last else { return }
+        guard !extending, queue.count - index < 5, let track = queue.last else { return }
+        let station = track["_station"] as? [String: Any]
+        guard station != nil || preferences["autoplay"] as? Bool != false else { return }
+        extending = true
+        defer { extending = false }
         let currentEpoch = epoch
         do {
-            let result = try await MobileGateway.shared.json("/v1/soundcloud/api/tracks/soundcloud%3Atracks%3A\(id(track))/related?limit=50&access=playable,preview")
-            guard currentEpoch == epoch, let candidates = result["collection"] as? [[String: Any]] else { return }
+            let seeds = (station?["seeds"] as? [[String: Any]] ?? [track]).filter { !blocked($0) }
+            guard !seeds.isEmpty else { return }
+            var pages: [[[String: Any]]] = []
+            for position in 0..<min(4, seeds.count) {
+                let seed = seeds[(stationVariation * 4 + position) % seeds.count]
+                let result = try? await MobileGateway.shared.json("/v1/soundcloud/api/tracks/soundcloud%3Atracks%3A\(id(seed))/related?limit=50&access=playable&linked_partitioning=true")
+                guard currentEpoch == epoch else { return }
+                pages.append(result?["collection"] as? [[String: Any]] ?? [])
+            }
+            stationVariation += 1
+            var candidates: [[String: Any]] = []
+            for position in 0..<(pages.map(\.count).max() ?? 0) { for page in pages where page.indices.contains(position) { candidates.append(page[position]) } }
+            let own = Set(seeds.map { normalized(artist($0)) })
+            let artistStation = station?["kind"] as? String == "artist"
+            var primary = station == nil ? [] : seeds
+            if artistStation { primary += candidates.filter { own.contains(normalized(artist($0))) }; candidates.removeAll { own.contains(normalized(artist($0))) } }
             var existing = Set(queue.map(id))
             var artists: [String: Int] = [:]
-            for var candidate in candidates.shuffled() {
+            var recordings = Set(queue.map { normalized($0["title"] as? String ?? "") + ":" + normalized(artist($0)) })
+            var added = 0, lastArtist = normalized(artist(track))
+            while added < 24 && (!primary.isEmpty || !candidates.isEmpty) {
+                let usePrimary = added % 3 == 2 && !primary.isEmpty || candidates.isEmpty
+                var pool = usePrimary ? primary : candidates
+                let alternative = usePrimary ? !candidates.isEmpty : !primary.isEmpty
+                guard !pool.isEmpty else { break }
+                var candidate = pool.removeFirst()
+                if usePrimary { primary = pool } else { candidates = pool }
                 if candidate["id"] == nil, let urn = candidate["urn"] as? String, let value = Int64(urn.split(separator: ":").last ?? "") { candidate["id"] = value }
                 let performer = normalized(artist(candidate))
-                if id(candidate) > 0 && !existing.contains(id(candidate)) && !blocked(candidate) && (artists[performer] ?? 0) < 2 { candidate["_recommended"] = true; queue.append(candidate); existing.insert(id(candidate)); artists[performer, default: 0] += 1 }
-                if queue.count - index >= 16 { break }
+                let recording = normalized(candidate["title"] as? String ?? "") + ":" + performer
+                let playable = !["SNIP", "BLOCK"].contains(candidate["policy"] as? String ?? "") && !["preview", "blocked"].contains(candidate["access"] as? String ?? "")
+                let limit = artistStation && own.contains(performer) ? 8 : 2
+                if id(candidate) > 0 && playable && !existing.contains(id(candidate)) && !recordings.contains(recording) && !blocked(candidate) && (artists[performer] ?? 0) < limit && (!alternative || lastArtist != performer) {
+                    candidate["_recommended"] = true; candidate["_station"] = station
+                    queue.append(candidate); existing.insert(id(candidate)); recordings.insert(recording); artists[performer, default: 0] += 1; lastArtist = performer; added += 1
+                }
             }
+            saveQueue()
+            try await fill(currentEpoch)
         } catch { }
     }
     private func tick() {
