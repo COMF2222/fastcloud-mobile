@@ -142,13 +142,19 @@ export type LyricsRecord = {
 };
 export const artist = (track: Track) =>
   (
-    track.publisher_metadata?.artist ||
-    track.metadata_artist ||
-    track.user?.username ||
-    "—"
+    [
+      track.publisher_metadata?.artist,
+      track.metadata_artist,
+      track.user?.username,
+    ].find(
+      (value) =>
+        typeof value === "string" &&
+        value.trim() &&
+        !/^(null|undefined)$/i.test(value.trim()),
+    ) || "—"
   )
     .replace(/^[\p{S}\s]+|[\p{S}\s]+$/gu, "")
-    .trim();
+    .trim() || "—";
 export const creditedArtists = (track: Track) =>
   artist(track)
     .split(/\s*(?:,|\bfeat\.?|\bft\.?|&|\bx\b)\s*/i)

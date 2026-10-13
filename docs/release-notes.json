@@ -2,6 +2,23 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.7",
+      "ru": {
+        "title": "Veirune Mobile 0.1.7",
+        "changes": [
+          "Волны по треку и артисту находят больше похожих исполнителей и реже повторяют исходного артиста.",
+          "В уведомлении и на экране блокировки отображаются обложка и имя исполнителя."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.7",
+        "changes": [
+          "Track and artist radio discovers more similar performers and repeats the source artist less often.",
+          "Playback notifications and the lock screen show artwork and a valid artist name."
+        ]
+      }
+    },
+    {
       "version": "0.1.6",
       "ru": {
         "title": "Veirune Mobile 0.1.6",

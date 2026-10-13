@@ -390,16 +390,15 @@ public class FastcloudPlugin extends Plugin {
     extras.putBoolean("recommended", false);
     JSONObject user = track.optJSONObject("user");
     JSONObject metadata = track.optJSONObject("publisher_metadata");
-    String artist =
-      metadata == null
-        ? track.optString(
-            "metadata_artist",
-            user == null ? "" : user.optString("username")
-          )
-        : metadata.optString(
-            "artist",
-            user == null ? "" : user.optString("username")
-          );
+    String artist = TrackMetadata.credit(
+      metadata == null ? null : metadata.opt("artist"),
+      track.opt("metadata_artist"),
+      user == null ? null : user.opt("username")
+    );
+    String artwork = TrackMetadata.artwork(
+      track.opt("artwork_url"),
+      user == null ? null : user.opt("avatar_url")
+    );
     return new MediaItem.Builder()
       .setMediaId(String.valueOf(id))
       .setUri("fastcloud://track/" + id)
@@ -408,6 +407,7 @@ public class FastcloudPlugin extends Plugin {
         new MediaMetadata.Builder()
           .setTitle(track.optString("title"))
           .setArtist(artist)
+          .setArtworkUri(artwork == null ? null : Uri.parse(artwork))
           .setExtras(extras)
           .build()
       )

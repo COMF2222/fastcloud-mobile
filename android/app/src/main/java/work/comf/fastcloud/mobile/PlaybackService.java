@@ -25,6 +25,7 @@ public class PlaybackService extends MediaSessionService {
   private MediaSession session;
   private Gateway gateway;
   private Listening listening;
+  private NotificationArtwork notificationArtwork;
   private androidx.media3.datasource.DataSource.Factory sources;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -86,8 +87,10 @@ public class PlaybackService extends MediaSessionService {
       new Intent(this, MainActivity.class),
       PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
     );
+    notificationArtwork = new NotificationArtwork(this, gateway);
     session = new MediaSession.Builder(this, player)
       .setSessionActivity(activity)
+      .setBitmapLoader(new CacheBitmapLoader(notificationArtwork))
       .build();
     restoreQueue();
     handler.post(tick);
@@ -770,10 +773,11 @@ public class PlaybackService extends MediaSessionService {
       !List.of("preview", "blocked").contains(track.optString("access"));
     JSONObject metadata = track.optJSONObject("publisher_metadata"),
       user = track.optJSONObject("user");
-    String artist = metadata == null ? "" : metadata.optString("artist");
-    if (artist.isBlank()) artist = track.optString("metadata_artist");
-    if (artist.isBlank()) artist =
-      user == null ? "" : user.optString("username");
+    String artist = TrackMetadata.credit(
+      metadata == null ? null : metadata.opt("artist"),
+      track.opt("metadata_artist"),
+      user == null ? null : user.opt("username")
+    );
     return new RadioMixer.Entry<>(
       track.optLong("id"),
       comparable(track.optString("title")),
@@ -857,21 +861,8 @@ public class PlaybackService extends MediaSessionService {
         pages.add(List.of());
       }
     }
-    var ownArtists = new HashSet<String>();
-    for (var seed : seeds) ownArtists.add(seed.artist());
-    long others = pages
-      .stream()
-      .flatMap(List::stream)
-      .filter(
-        row ->
-          row.playable() &&
-          !ownArtists.contains(row.artist()) &&
-          previous.stream().noneMatch(seen -> seen.id() == row.id())
-      )
-      .map(RadioMixer.Entry::artist)
-      .distinct()
-      .count();
-    if (others < 3) {
+    boolean artistStation = "artist".equals(context.optString("kind"));
+    if (RadioMixer.needsExpansion(seeds, pages, previous, artistStation)) {
       // Some related-track shelves contain almost only the source uploader.
       // Ask SoundCloud for related profiles before broadening to the same genre.
       JSONObject anchor = seeds.get(0).value(),
@@ -900,7 +891,7 @@ public class PlaybackService extends MediaSessionService {
             lookup.cancel(true);
           }
           var users = relatedUsers.getJSONArray("collection");
-          for (int i = 0; i < Math.min(3, users.length()); i++) {
+          for (int i = 0; i < Math.min(6, users.length()); i++) {
             long id = users
               .getJSONObject(Math.floorMod(variation * 3 + i, users.length()))
               .optLong("id");
@@ -929,20 +920,11 @@ public class PlaybackService extends MediaSessionService {
           search.cancel(true);
         }
       }
-      long expanded = pages
-        .stream()
-        .flatMap(List::stream)
-        .filter(
-          row ->
-            row.playable() &&
-            !ownArtists.contains(row.artist()) &&
-            previous.stream().noneMatch(seen -> seen.id() == row.id())
-        )
-        .map(RadioMixer.Entry::artist)
-        .distinct()
-        .count();
       String genre = anchor.optString("genre").trim();
-      if (expanded < 3 && !genre.isEmpty()) {
+      if (
+        RadioMixer.needsExpansion(seeds, pages, previous, artistStation) &&
+        !genre.isEmpty()
+      ) {
         var search = radioIo.submit(() ->
           radioPage(
             "/v1/soundcloud/api/tracks?genres=" +
@@ -960,12 +942,7 @@ public class PlaybackService extends MediaSessionService {
     if (pages.stream().allMatch(List::isEmpty)) throw new java.io.IOException(
       "Related music unavailable"
     );
-    var result = RadioMixer.mix(
-      seeds,
-      pages,
-      "artist".equals(context.optString("kind")),
-      previous
-    );
+    var result = RadioMixer.mix(seeds, pages, artistStation, previous);
     android.util.Log.i(
       "VeiruneRadio",
       "kind=" +
@@ -1079,6 +1056,7 @@ public class PlaybackService extends MediaSessionService {
     });
     io.shutdown();
     session.release();
+    if (notificationArtwork != null) notificationArtwork.close();
     releasePlayer(player);
     super.onDestroy();
   }

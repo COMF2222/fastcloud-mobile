@@ -30,3 +30,22 @@ browser/demo checks from device audio, installation and launcher behavior.
 Also check changing all icon choices, restarting the app, restoring Moon and
 upgrading without losing the chosen launcher icon. Android and iOS icon choices
 are not copied from another device's account settings.
+
+## Android 0.1.7 — 2026-10-13
+
+Production web build, signed Android release build, JVM tests and Android lint
+passed. Shared TypeScript tests: 39 passed. App lint reports zero errors; its
+existing resource/dependency warnings remain. Release staging verified version
+0.1.7, build 1007, package and persistent release certificate.
+
+A fixture captured from public SoundCloud metadata through the backend contains
+39 related tracks and 63 tracks from six related profiles for Lil Peep's
+"white wine". The original shelf triggers expansion. Artist radio selected
+16 tracks with 10 performer credits (three credited Lil Peep); track radio
+selected 13 with nine credits (one credited Lil Peep). This verifies selection
+on that fixture, not every artist or live endless playback. The authenticated
+artwork relay returned a valid 500 px JPEG for the same track.
+
+Honor is disconnected. Notification/lock-screen rendering, continuous station
+refill and listening quality still need a device check after installing 0.1.7.
+iOS runtime behavior was not tested.

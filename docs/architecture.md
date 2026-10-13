@@ -124,3 +124,14 @@ recommended songs. Sparse shelves expand through related profiles and then the
 source genre. A delayed result is accepted only by the same station session;
 skipping within that station does not discard a useful pending batch. Queue
 appends recheck live dislikes and IDs.
+
+Android radio measures usable tracks from other performers rather than counting
+uploader names. Reuploads explicitly labelled with the source performer share
+that performer's selection quota without changing displayed credits. When the
+shelf lacks alternatives, it reads up to six related profiles. Source tracks
+share one quota across seed credits; the quota shrinks for sparse shelves.
+
+Android notification and lock-screen metadata reject placeholder artist strings
+and fall back to track metadata or the uploader. Covers use the authenticated
+backend artwork relay and account cache, with a separate two-worker bitmap pool
+so image loading does not occupy playback or radio workers.
