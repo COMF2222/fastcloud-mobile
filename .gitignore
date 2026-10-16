@@ -19,3 +19,4 @@ release/
 
 __pycache__/
 *.pyc
+.qa/

@@ -38,6 +38,7 @@ import {
 } from "./ui";
 import { artist, type Track, type Playlist, type User } from "./types";
 import { moodQuery } from "./mood";
+import { ArtistCatalog } from "./ArtistCatalog";
 
 export function Home() {
   const t = useText();
@@ -748,14 +749,19 @@ export function UserList({ users }: { users: User[] }) {
     </div>
   );
 }
-export function Following() {
+export function Following({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useText(),
     data = useResource(() => api.following(), []);
   const [query, setQuery] = useState("");
   return (
     <>
-      <h1>{t("Подписки", "Following")}</h1>
+      {embedded ? (
+        <h2>{t("Подписки", "Following")}</h2>
+      ) : (
+        <h1>{t("Подписки", "Following")}</h1>
+      )}
       <input
+        aria-label={t("Найти человека", "Find a person")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t("Найти человека", "Find a person")}
@@ -772,9 +778,15 @@ export function Following() {
 export function ArtistPage() {
   const t = useText();
   const user = useApp((s) => s.detail) as User;
+  const me = useApp((s) => s.me);
+  const isOwn = me?.id === user.id;
   const profile = useResource(() => api.user(user.id), [user.id], user),
     data = useResource(() => api.userTracks(user.id), [user.id], []);
-  const lists = useResource(() => api.userPlaylists(user.id), [user.id], []);
+  const lists = useResource(
+    () => (isOwn ? api.playlists() : api.userPlaylists(user.id)),
+    [user.id, isOwn],
+    [],
+  );
   const following = useResource(() => api.following(), []);
   const followed =
     following.value?.some((person) => person.id === user.id) === true;
@@ -787,31 +799,52 @@ export function ArtistPage() {
           className="profile-cover"
         />
         <h1>{profile.value?.username}</h1>
-        <p>{profile.value?.description}</p>
+        {profile.value?.description && (
+          <details className="artist-bio">
+            <summary>{t("Об артисте", "About the artist")}</summary>
+            <p>{profile.value.description}</p>
+          </details>
+        )}
         <div className="collection-actions">
           <StationButton kind="artist" tracks={data.value || []} />
-          <button
-            className="primary"
-            disabled={followBusy || following.loading}
-            aria-pressed={followed}
-            onClick={() => {
-              setFollowBusy(true);
-              void run(async () => {
-                await api.follow(user.id, !followed);
-                useApp.setState((state) => ({ revision: state.revision + 1 }));
-              }).finally(() => setFollowBusy(false));
-            }}
-          >
-            {followed ? <Minus size={18} /> : <Plus size={18} />}
-            {followed
-              ? t("Отписаться", "Unfollow")
-              : t("Подписаться", "Follow")}
-          </button>
+          {!isOwn && (
+            <button
+              className="primary"
+              disabled={followBusy || following.loading}
+              aria-pressed={followed}
+              onClick={() => {
+                setFollowBusy(true);
+                void run(async () => {
+                  await api.follow(user.id, !followed);
+                  useApp.setState((state) => ({
+                    revision: state.revision + 1,
+                  }));
+                }).finally(() => setFollowBusy(false));
+              }}
+            >
+              {followed ? <Minus size={18} /> : <Plus size={18} />}
+              {followed
+                ? t("Отписаться", "Unfollow")
+                : t("Подписаться", "Follow")}
+            </button>
+          )}
         </div>
       </div>
-      <Status error={data.error} loading={data.loading} />
-      <TrackList tracks={data.value || []} />
-      <PlaylistCards lists={lists.value || []} />
+      <Status error={profile.error} />
+      <ArtistCatalog
+        key={user.id}
+        userId={user.id}
+        tracks={data}
+        lists={lists}
+        ownSections={
+          isOwn
+            ? {
+                following: <Following embedded />,
+                dislikes: <Dislikes embedded />,
+              }
+            : undefined
+        }
+      />
     </>
   );
 }
@@ -839,6 +872,13 @@ export function Profile() {
         <h1>{me?.username}</h1>
       </div>
       <div className="menu-list profile-menu">
+        {me && (
+          <button onClick={() => go("artist", me)}>
+            <Users />
+            {t("Профиль SoundCloud", "SoundCloud profile")}
+            <ArrowRight size={18} />
+          </button>
+        )}
         {items.map(([page, Icon, ru, en]) => (
           <button key={page} onClick={() => go(page)}>
             <Icon />
@@ -854,7 +894,7 @@ export function Profile() {
     </>
   );
 }
-export function Dislikes() {
+export function Dislikes({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useText();
   const values = useCloud((s) => s.cloud.trackFeedback);
   const tracks = Object.values(values)
@@ -870,7 +910,11 @@ export function Dislikes() {
     }));
   return (
     <>
-      <h1>{t("Дизлайки", "Dislikes")}</h1>
+      {embedded ? (
+        <h2>{t("Дизлайки", "Dislikes")}</h2>
+      ) : (
+        <h1>{t("Дизлайки", "Dislikes")}</h1>
+      )}
       <p className="muted">
         {t(
           "Эти треки исключены из рекомендаций.",

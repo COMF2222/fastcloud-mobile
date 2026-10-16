@@ -31,6 +31,7 @@ export type Playlist = {
   permalink_url?: string | null;
   is_album?: boolean;
   playlist_type?: string | null;
+  set_type?: string | null;
   genre?: string | null;
   tag_list?: string | null;
 };

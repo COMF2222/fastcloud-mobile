@@ -56,6 +56,40 @@ export async function demoRequest(
     return {
       collection: demoTracks.filter((track) => track.user?.id === tracksUser),
     };
+  if (/^\/users\/soundcloud:users:\d+\/(likes|reposts)\/tracks$/.test(route))
+    return { collection: demoTracks.slice(2, 5).map((track) => ({ track })) };
+  if (/^\/users\/soundcloud:users:\d+\/reposts\/playlists$/.test(route))
+    return { collection: [{ playlist: demoPlaylists[1] }] };
+  const listsUser = Number(
+    route.match(/^\/users\/soundcloud:users:(\d+)\/playlists$/)?.[1],
+  );
+  if (listsUser)
+    return {
+      collection: [
+        {
+          ...demoPlaylists[0],
+          user: {
+            id: listsUser,
+            username:
+              ["Lil Peep", "CUPSIZE", "JESUS", "Luna"][listsUser - 1] ||
+              "Artist",
+          },
+        },
+        {
+          ...demoPlaylists[1],
+          id: 2101,
+          title: "Evening Tapes",
+          is_album: true,
+          playlist_type: "album",
+          user: {
+            id: listsUser,
+            username:
+              ["Lil Peep", "CUPSIZE", "JESUS", "Luna"][listsUser - 1] ||
+              "Artist",
+          },
+        },
+      ],
+    };
   if (route.endsWith("/comments"))
     return {
       collection: [

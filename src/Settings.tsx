@@ -1,5 +1,5 @@
-import { AppIconPicker } from './AppIconPicker';
-import { useEffect, useState } from "react";
+import { AppIconPicker } from "./AppIconPicker";
+import { useEffect, useRef, useState } from "react";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
@@ -10,6 +10,7 @@ import { useApp, notify, run } from "./state";
 import { nativePlatform, supportsAudioEffects } from "./native";
 import { Sheet, InputDialog, useResource, useText } from "./ui";
 import { saveWallpaper, useWallpaper } from "./wallpaper";
+import { WallpaperEditor } from "./WallpaperEditor";
 import { validateBackup } from "./backup";
 import { UpdateSettings } from "./UpdateUI";
 const colours = [
@@ -125,6 +126,10 @@ export function Settings() {
     status = useCloud((s) => s.status);
   const prefs = cloud.preferences;
   const wallpaper = useWallpaper((s) => s.url);
+  const [wallpaperEdit, setWallpaperEdit] = useState<{
+    file: File | null;
+  } | null>(null);
+  const wallpaperInput = useRef<HTMLInputElement>(null);
   const [genreOpen, setGenreOpen] = useState(false),
     [presetOpen, setPresetOpen] = useState(false);
   const [savePreset, setSavePreset] = useState(false);
@@ -228,7 +233,19 @@ export function Settings() {
           ))}
           <input
             type="color"
-            value={'#' + ((prefs.accent_rgb as number[]) || (prefs.theme === "Light" ? [37,42,75] : [255,255,255])).map(value => Math.max(0,Math.min(255,value)).toString(16).padStart(2,"0")).join("")}
+            value={
+              "#" +
+              (
+                (prefs.accent_rgb as number[]) ||
+                (prefs.theme === "Light" ? [37, 42, 75] : [255, 255, 255])
+              )
+                .map((value) =>
+                  Math.max(0, Math.min(255, value))
+                    .toString(16)
+                    .padStart(2, "0"),
+                )
+                .join("")
+            }
             aria-label={t("Свой цвет", "Custom colour")}
             onChange={(e) =>
               save(
@@ -270,19 +287,26 @@ export function Settings() {
           onChange={(v) => save("background_blur", v)}
         />
         <div className="settings-actions">
-          <label className="button">
+          <button onClick={() => wallpaperInput.current?.click()}>
             <Image size={18} />
             {t("Выбрать фон", "Choose wallpaper")}
-            <input
-              hidden
-              type="file"
-              accept="image/*,video/mp4,video/webm"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void run(() => saveWallpaper(file));
-              }}
-            />
-          </label>
+          </button>
+          <input
+            hidden
+            ref={wallpaperInput}
+            type="file"
+            accept="image/*,video/mp4,video/webm"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setWallpaperEdit({ file });
+              e.target.value = "";
+            }}
+          />
+          {wallpaper && (
+            <button onClick={() => setWallpaperEdit({ file: null })}>
+              {t("Настроить фон", "Adjust wallpaper")}
+            </button>
+          )}
           {wallpaper && (
             <button onClick={() => void run(() => saveWallpaper(null))}>
               {t("Убрать фон", "Remove wallpaper")}
@@ -563,6 +587,12 @@ export function Settings() {
               ].slice(-20),
             );
           }}
+        />
+      )}
+      {wallpaperEdit && (
+        <WallpaperEditor
+          file={wallpaperEdit.file}
+          onClose={() => setWallpaperEdit(null)}
         />
       )}
     </>

@@ -2,6 +2,25 @@
   "schema": 1,
   "releases": [
     {
+      "version": "0.1.8",
+      "ru": {
+        "title": "Veirune Mobile 0.1.8",
+        "changes": [
+          "В профиле появились треки, популярное, альбомы, плейлисты, лайки и репосты с поиском. В своём профиле также доступны подписки и дизлайки.",
+          "Фон можно перемещать и масштабировать прямо на весь экран перед сохранением, а также настроить повторно без загрузки файла.",
+          "Длительность длинных треков и время в плеере отображаются с часами: 2:20:00 вместо 140:00."
+        ]
+      },
+      "en": {
+        "title": "Veirune Mobile 0.1.8",
+        "changes": [
+          "Profiles now include searchable tracks, popular songs, albums, playlists, likes and reposts. Your own profile also includes following and dislikes.",
+          "Position and zoom wallpapers in a full-screen preview before saving, or adjust an existing wallpaper without uploading it again.",
+          "Long track durations and playback timestamps show hours: 2:20:00 instead of 140:00."
+        ]
+      }
+    },
+    {
       "version": "0.1.7",
       "ru": {
         "title": "Veirune Mobile 0.1.7",

@@ -3,23 +3,52 @@ import { Preferences } from "@capacitor/preferences";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
 import { nativePlatform } from "./native";
-export const useWallpaper = create<{ url: string | null; video: boolean }>(
-  () => ({ url: null, video: false }),
-);
+import {
+  defaultPlacement,
+  normalizePlacement,
+  type Placement,
+} from "./wallpaperPlacement";
+export const useWallpaper = create<{
+  url: string | null;
+  video: boolean;
+  placement: Placement;
+}>(() => ({ url: null, video: false, placement: { ...defaultPlacement } }));
 export async function loadWallpaper() {
   const saved = await Preferences.get({ key: "wallpaper" });
   if (saved.value) {
-    const value = JSON.parse(saved.value);
+    let value;
+    try {
+      value = JSON.parse(saved.value);
+    } catch {
+      return;
+    }
+    if (!value || typeof value.url !== "string") return;
     useWallpaper.setState({
       url: nativePlatform ? Capacitor.convertFileSrc(value.url) : value.url,
       video: value.video,
+      placement: normalizePlacement(value.placement),
     });
   }
 }
-export async function saveWallpaper(file: File | null) {
+export async function saveWallpaperPlacement(placement: Placement) {
+  const saved = await Preferences.get({ key: "wallpaper" });
+  if (!saved.value) throw Error("Choose a wallpaper first");
+  const value = JSON.parse(saved.value);
+  value.placement = normalizePlacement(placement);
+  await Preferences.set({ key: "wallpaper", value: JSON.stringify(value) });
+  useWallpaper.setState({ placement: value.placement });
+}
+export async function saveWallpaper(
+  file: File | null,
+  placement: Placement = defaultPlacement,
+) {
   if (!file) {
     await Preferences.remove({ key: "wallpaper" });
-    useWallpaper.setState({ url: null, video: false });
+    useWallpaper.setState({
+      url: null,
+      video: false,
+      placement: { ...defaultPlacement },
+    });
     return;
   }
   if (file.size > 25 * 1024 * 1024)
@@ -54,10 +83,15 @@ export async function saveWallpaper(file: File | null) {
     });
     url = result.uri;
   }
-  const value = { url, video: file.type.startsWith("video/") };
+  const value = {
+    url,
+    video: file.type.startsWith("video/"),
+    placement: normalizePlacement(placement),
+  };
   await Preferences.set({ key: "wallpaper", value: JSON.stringify(value) });
   useWallpaper.setState({
     url: nativePlatform ? Capacitor.convertFileSrc(url) : url,
     video: value.video,
+    placement: value.placement,
   });
 }

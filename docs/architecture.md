@@ -135,3 +135,26 @@ Android notification and lock-screen metadata reject placeholder artist strings
 and fall back to track metadata or the uploader. Covers use the authenticated
 backend artwork relay and account cache, with a separate two-worker bitmap pool
 so image loading does not occupy playback or radio workers.
+
+## Artist catalog and wallpaper framing
+
+Artist profiles expose tracks, popularity, releases, playlists, likes and reposts through
+`ArtistCatalog`. Tracks and the paginated public playlist collection retain
+independent loading/error/retry states. Album, EP, single and compilation flags
+are classified before filtering; only Popular explicitly sorts by play count.
+Activity routes load on selection, with separate track/playlist repost resources.
+Own profiles also include saved collections, following and local/cloud dislikes.
+
+Wallpaper framing is device-local, alongside the existing durable media URL in
+Capacitor Preferences. Older records default to centered cover at 100%.
+`wallpaperPlacement` normalizes position and zoom, computes drag/pinch geometry,
+and supplies identical rendering styles to the editor and application background.
+The editor canvas fills the entire viewport, with compact overlaid controls;
+additional placement settings expand on demand.
+Saving placement alone does not rewrite media. New images, GIFs and videos keep
+their original bytes. Cancelling the editor discards its temporary object URL and
+leaves the saved background unchanged. Framing is not synced between devices
+with different aspect ratios.
+
+Playback timestamps share `formatTime`: m:ss below one hour and h:mm:ss from
+one hour onward, for both elapsed time and total duration.

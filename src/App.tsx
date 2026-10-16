@@ -43,6 +43,7 @@ import { useCloud, syncCloud, activeCloudAccount } from "./cloud";
 import { usePlayer, refreshPlayer } from "./player";
 import { native, nativePlatform, preview } from "./native";
 import { loadWallpaper, useWallpaper } from "./wallpaper";
+import { placementStyle } from "./wallpaperPlacement";
 import { useText } from "./ui";
 import { invalidateRequests } from "./client";
 export default function App() {
@@ -173,9 +174,20 @@ export default function App() {
           style={{ filter: `blur(${Number(prefs.background_blur) || 0}px)` }}
         >
           {wallpaper.video ? (
-            <video src={wallpaper.url} autoPlay muted playsInline loop />
+            <video
+              src={wallpaper.url}
+              style={placementStyle(wallpaper.placement)}
+              autoPlay
+              muted
+              playsInline
+              loop
+            />
           ) : (
-            <img src={wallpaper.url} alt="" />
+            <img
+              src={wallpaper.url}
+              style={placementStyle(wallpaper.placement)}
+              alt=""
+            />
           )}
           <div
             className="wallpaper-shade"

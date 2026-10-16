@@ -124,6 +124,16 @@ export const api = {
     ),
   userPlaylists: (id: number) =>
     collection<Playlist>(`/users/${urn("users", id)}/playlists?limit=200`),
+  userLikes: (id: number) =>
+    collection<Track>(
+      `/users/${urn("users", id)}/likes/tracks?limit=200&access=playable,preview,blocked`,
+    ),
+  userReposts: (id: number) =>
+    collection<Track>(`/users/${urn("users", id)}/reposts/tracks?limit=200`),
+  userRepostedPlaylists: (id: number) =>
+    collection<Playlist>(
+      `/users/${urn("users", id)}/reposts/playlists?limit=200`,
+    ),
   related: (id: number) =>
     collection<Track>(
       `/tracks/${urn("tracks", id)}/related?limit=50&access=playable,preview`,

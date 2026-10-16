@@ -142,12 +142,16 @@ export function Sheet({
   title,
   children,
   onClose,
+  variant = "sheet",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  variant?: "sheet" | "fullscreen";
 }) {
   const close = useRef<HTMLButtonElement>(null);
+  const closeAction = useRef(onClose);
+  closeAction.current = onClose;
   const t = useText();
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
@@ -160,11 +164,11 @@ export function Sheet({
         dialogs[dialogs.length - 1]
       )
         return;
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") closeAction.current();
       if (event.key === "Tab") {
         const root = close.current?.closest('[role="dialog"]');
         const targets = root?.querySelectorAll<HTMLElement>(
-          "button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href]",
+          "button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href],[tabindex='0']",
         );
         if (targets?.length) {
           const first = targets[0],
@@ -187,15 +191,18 @@ export function Sheet({
     };
   }, []);
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div
+      className={`sheet-backdrop ${variant === "fullscreen" ? "fullscreen-backdrop" : ""}`}
+      onClick={onClose}
+    >
       <section
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="sheet"
+        className={`sheet ${variant === "fullscreen" ? "sheet-fullscreen" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sheet-handle" />
+        {variant === "sheet" && <div className="sheet-handle" />}
         <header>
           <h2>{title}</h2>
           <button
@@ -482,8 +489,7 @@ export function PlaylistCards({ lists }: { lists: Playlist[] }) {
     </div>
   );
 }
-export const time = (ms: number) =>
-  `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+export { formatTime as time } from "./formatTime";
 export function InputDialog({
   title,
   onClose,
